@@ -1,4 +1,15 @@
-{ pkgs, lib, deps, utils, services, drv, format, meta, target, ... }:
+{
+  pkgs,
+  lib,
+  deps,
+  utils,
+  services,
+  drv,
+  format,
+  meta,
+  target,
+  ...
+}:
 
 let
   winArch = if target.arch == "x86_64" then "x64" else target.arch;
@@ -7,11 +18,13 @@ let
   # Stable per-product upgrade code derived from bundleId.
   # In a real release you want to pin this — exposed via meta.msiUpgradeCode.
   upgradeCode =
-    if meta.msiUpgradeCode or null != null
-    then meta.msiUpgradeCode
+    if meta.msiUpgradeCode or null != null then
+      meta.msiUpgradeCode
     else
-      let h = builtins.hashString "md5" meta.bundleId;
-      in lib.toUpper "${builtins.substring 0 8 h}-${builtins.substring 8 4 h}-${builtins.substring 12 4 h}-${builtins.substring 16 4 h}-${builtins.substring 20 12 h}";
+      let
+        h = builtins.hashString "md5" meta.bundleId;
+      in
+      lib.toUpper "${builtins.substring 0 8 h}-${builtins.substring 8 4 h}-${builtins.substring 12 4 h}-${builtins.substring 16 4 h}-${builtins.substring 20 12 h}";
 
   msiArchAttr = if target.arch == "x86_64" then ''Platform="x64"'' else "";
   programFilesId = if target.arch == "x86_64" then "ProgramFiles64Folder" else "ProgramFilesFolder";
@@ -73,7 +86,11 @@ pkgs.stdenv.mkDerivation {
   name = outFile;
   dontUnpack = true;
   nativeBuildInputs = with pkgs; [
-    msitools coreutils gnused rsync findutils
+    msitools
+    coreutils
+    gnused
+    rsync
+    findutils
   ];
 
   buildCommand = ''
@@ -85,15 +102,17 @@ pkgs.stdenv.mkDerivation {
     fi
     chmod -R u+w payload
 
-    ${let
+    ${
+      let
         exeRel = "${meta.name}.exe";
         installBat = services.renderWindowsBundleBat meta.services { exeRelative = exeRel; };
         uninstallBat = services.renderWindowsUninstallBat meta.services;
       in
-        lib.optionalString (meta.services != []) ''
-          cp ${pkgs.writeText "install-services.bat" installBat}   payload/install-services.bat
-          cp ${pkgs.writeText "uninstall-services.bat" uninstallBat} payload/uninstall-services.bat
-        ''}
+      lib.optionalString (meta.services != [ ]) ''
+        cp ${pkgs.writeText "install-services.bat" installBat}   payload/install-services.bat
+        cp ${pkgs.writeText "uninstall-services.bat" uninstallBat} payload/uninstall-services.bat
+      ''
+    }
 
     cp ${pkgs.writeText "installer.wxs" wxs} installer.wxs
     ${pkgs.gnused}/bin/sed -i 's/^    //' installer.wxs
@@ -117,5 +136,8 @@ pkgs.stdenv.mkDerivation {
     cp "${outFile}" "$out/${outFile}"
   '';
 
-  passthru = { info = meta; inherit target format; };
+  passthru = {
+    info = meta;
+    inherit target format;
+  };
 }

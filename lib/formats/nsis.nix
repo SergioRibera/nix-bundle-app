@@ -1,4 +1,14 @@
-{ pkgs, lib, deps, services, drv, format, meta, target, ... }:
+{
+  pkgs,
+  lib,
+  deps,
+  services,
+  drv,
+  format,
+  meta,
+  target,
+  ...
+}:
 
 let
   installDirName = meta.installDirName;
@@ -10,7 +20,7 @@ let
   exeRel = "${meta.name}.exe";
   installBat = services.renderWindowsBundleBat meta.services { exeRelative = exeRel; };
   uninstallBat = services.renderWindowsUninstallBat meta.services;
-  hasServices = meta.services != [];
+  hasServices = meta.services != [ ];
 
   nsi = ''
     !define APPNAME "${meta.name}"
@@ -73,32 +83,40 @@ in
 pkgs.stdenv.mkDerivation {
   name = outFile;
   dontUnpack = true;
-  nativeBuildInputs = [ pkgs.nsis pkgs.coreutils pkgs.gnused pkgs.rsync ];
+  nativeBuildInputs = [
+    pkgs.nsis
+    pkgs.coreutils
+    pkgs.gnused
+    pkgs.rsync
+  ];
 
   buildCommand = ''
-    mkdir -p payload
-    ${deps.copyBinaries drv "payload"}
-    ${deps.copyWindowsDlls drv "payload"}
-    if [ -d "${drv}/share" ]; then
-      ${pkgs.rsync}/bin/rsync -a --copy-links "${drv}/share/" "payload/share/" || true
-    fi
-    chmod -R u+w payload
+        mkdir -p payload
+        ${deps.copyBinaries drv "payload"}
+        ${deps.copyWindowsDlls drv "payload"}
+        if [ -d "${drv}/share" ]; then
+          ${pkgs.rsync}/bin/rsync -a --copy-links "${drv}/share/" "payload/share/" || true
+        fi
+        chmod -R u+w payload
 
-    ${lib.optionalString hasServices ''
-      cp ${pkgs.writeText "install-services.bat" installBat}   payload/install-services.bat
-      cp ${pkgs.writeText "uninstall-services.bat" uninstallBat} payload/uninstall-services.bat
-    ''}
+        ${lib.optionalString hasServices ''
+          cp ${pkgs.writeText "install-services.bat" installBat}   payload/install-services.bat
+          cp ${pkgs.writeText "uninstall-services.bat" uninstallBat} payload/uninstall-services.bat
+        ''}
 
-    cat > installer.nsi <<'NSIEOF'
-${nsi}
-NSIEOF
-    ${pkgs.gnused}/bin/sed -i 's/^    //' installer.nsi
+        cat > installer.nsi <<'NSIEOF'
+    ${nsi}
+    NSIEOF
+        ${pkgs.gnused}/bin/sed -i 's/^    //' installer.nsi
 
-    makensis -V2 -INPUTCHARSET UTF8 installer.nsi
+        makensis -V2 -INPUTCHARSET UTF8 installer.nsi
 
-    mkdir -p $out
-    cp "${outFile}" "$out/${outFile}"
+        mkdir -p $out
+        cp "${outFile}" "$out/${outFile}"
   '';
 
-  passthru = { info = meta; inherit target format; };
+  passthru = {
+    info = meta;
+    inherit target format;
+  };
 }

@@ -1,9 +1,29 @@
-{ pkgs, lib, deps, utils, desktop, services, drv, format, meta, target }:
+{
+  pkgs,
+  lib,
+  deps,
+  utils,
+  desktop,
+  services,
+  drv,
+  format,
+  meta,
+  target,
+}:
 
 let
-  common = import ./_common-linux.nix { inherit pkgs lib deps utils desktop services; };
-  reqs = meta.depends.rpm or [];
-  recs = meta.depends.rpmRecommends or [];
+  common = import ./_common-linux.nix {
+    inherit
+      pkgs
+      lib
+      deps
+      utils
+      desktop
+      services
+      ;
+  };
+  reqs = meta.depends.rpm or [ ];
+  recs = meta.depends.rpmRecommends or [ ];
   group = meta.depends.rpmGroup or "Applications/System";
 
   hasEntries = meta.desktopEntries != [ ];
@@ -12,7 +32,15 @@ in
 pkgs.stdenv.mkDerivation {
   name = "${meta.name}-${meta.version}-1.${meta.rpmArch}.rpm";
   dontUnpack = true;
-  nativeBuildInputs = with pkgs; [ rpm patchelf file gnugrep rsync coreutils gnused ];
+  nativeBuildInputs = with pkgs; [
+    rpm
+    patchelf
+    file
+    gnugrep
+    rsync
+    coreutils
+    gnused
+  ];
 
   buildCommand = ''
     export HOME=$(mktemp -d)
@@ -25,7 +53,10 @@ pkgs.stdenv.mkDerivation {
 
     rpm --initdb --dbpath "$RPM_DB_PATH"
 
-    ${common.stageLinux { inherit drv meta target; stage = "$buildroot"; }}
+    ${common.stageLinux {
+      inherit drv meta target;
+      stage = "$buildroot";
+    }}
 
     # rpmbuild's %clean wants to rm the buildroot; nix store copies come
     # in read-only. Make everything writable so cleanup succeeds.
@@ -41,8 +72,8 @@ pkgs.stdenv.mkDerivation {
     Group: ${group}
     BuildArch: ${meta.rpmArch}
     AutoReqProv: no
-    ${lib.optionalString (reqs != []) "Requires: ${lib.concatStringsSep ", " reqs}"}
-    ${lib.optionalString (recs != []) "Recommends: ${lib.concatStringsSep ", " recs}"}
+    ${lib.optionalString (reqs != [ ]) "Requires: ${lib.concatStringsSep ", " reqs}"}
+    ${lib.optionalString (recs != [ ]) "Recommends: ${lib.concatStringsSep ", " recs}"}
 
     %description
     ${meta.longDescription}
@@ -90,5 +121,8 @@ pkgs.stdenv.mkDerivation {
        "$out/${meta.name}-${meta.version}-1.${meta.rpmArch}.rpm"
   '';
 
-  passthru = { info = meta; inherit target format; };
+  passthru = {
+    info = meta;
+    inherit target format;
+  };
 }

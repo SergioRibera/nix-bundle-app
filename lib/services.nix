@@ -6,14 +6,14 @@ let
     user = null;
     group = null;
     workingDirectory = null;
-    environment = {};
-    restart = "on-failure";       # always | on-failure | no
+    environment = { };
+    restart = "on-failure";
     restartSec = 5;
     startAtBoot = true;
     after = [ "network.target" ];
     requires = [ ];
     wants = [ ];
-    type = "simple";              # simple | forking | oneshot | notify | dbus
+    type = "simple";
     stdout = null;
     stderr = null;
 
@@ -30,45 +30,47 @@ let
       runAtLoad = true;
       abandonProcessGroup = false;
       throttleInterval = null;
-      processType = null;        # Background | Standard | Adaptive | Interactive
+      processType = null;
     };
 
     windows = {
       serviceName = null;
       displayName = null;
-      account = "LocalSystem";   # LocalSystem | LocalService | NetworkService
-      start = "auto";            # auto | demand | disabled
+      account = "LocalSystem";
+      start = "auto";
       depends = [ ];
-      errorControl = "normal";   # normal | severe | critical | ignore
+      errorControl = "normal";
     };
   };
 
   normalize = svc: lib.recursiveUpdate serviceDefaults svc;
 
-  # ---------- systemd ----------
-
-  iniLine = k: v:
-    if v == null then null
-    else if v == "" then null
+  iniLine =
+    k: v:
+    if v == null then
+      null
+    else if v == "" then
+      null
     else if builtins.isList v then
-      if v == [] then null else "${k}=${lib.concatStringsSep " " (map toString v)}"
-    else if builtins.isBool v then "${k}=${if v then "yes" else "no"}"
-    else "${k}=${toString v}";
+      if v == [ ] then null else "${k}=${lib.concatStringsSep " " (map toString v)}"
+    else if builtins.isBool v then
+      "${k}=${if v then "yes" else "no"}"
+    else
+      "${k}=${toString v}";
 
-  iniSection = header: pairs:
+  iniSection =
+    header: pairs:
     let
-      lines = builtins.filter (l: l != null)
-        (lib.mapAttrsToList iniLine pairs);
-    in if lines == [] then null
-       else lib.concatStringsSep "\n" ([ "[${header}]" ] ++ lines);
+      lines = builtins.filter (l: l != null) (lib.mapAttrsToList iniLine pairs);
+    in
+    if lines == [ ] then null else lib.concatStringsSep "\n" ([ "[${header}]" ] ++ lines);
 
-  renderSystemd = raw:
+  renderSystemd =
+    raw:
     let
       s = normalize raw;
-      envLines = lib.mapAttrsToList
-        (k: v: ''Environment="${k}=${toString v}"'') s.environment;
-      envBlock =
-        if envLines == [] then null else lib.concatStringsSep "\n" envLines;
+      envLines = lib.mapAttrsToList (k: v: ''Environment="${k}=${toString v}"'') s.environment;
+      envBlock = if envLines == [ ] then null else lib.concatStringsSep "\n" envLines;
 
       unitKv = lib.recursiveUpdate {
         Description = s.description;
@@ -90,57 +92,58 @@ let
       } s.systemd.serviceOverrides;
 
       installKv = lib.recursiveUpdate {
-        WantedBy = if s.startAtBoot then s.systemd.wantedBy else [];
+        WantedBy = if s.startAtBoot then s.systemd.wantedBy else [ ];
       } s.systemd.installOverrides;
 
       unitBlock = iniSection "Unit" unitKv;
       serviceBlockBase = iniSection "Service" serviceKv;
-      serviceBlock =
-        if envBlock == null then serviceBlockBase
-        else "${serviceBlockBase}\n${envBlock}";
+      serviceBlock = if envBlock == null then serviceBlockBase else "${serviceBlockBase}\n${envBlock}";
       installBlock = iniSection "Install" installKv;
 
-      sections = builtins.filter (b: b != null)
-        [ unitBlock serviceBlock installBlock ];
+      sections = builtins.filter (b: b != null) [
+        unitBlock
+        serviceBlock
+        installBlock
+      ];
       content = lib.concatStringsSep "\n\n" sections + "\n";
-    in {
+    in
+    {
       filename = "${s.name}.service";
       content = content;
       name = s.name;
       enable = s.startAtBoot;
     };
 
-  # ---------- launchd ----------
-
   xmlEsc = utils.xmlEscape;
 
-  renderLaunchd = raw:
+  renderLaunchd =
+    raw:
     let
       s = normalize raw;
       label =
-        if (s.launchd.label or null) != null && s.launchd.label != ""
-        then s.launchd.label else s.name;
+        if (s.launchd.label or null) != null && s.launchd.label != "" then s.launchd.label else s.name;
       argv = builtins.filter (x: x != "") (lib.splitString " " s.exec);
       argvLines = map (a: "    <string>${xmlEsc a}</string>") argv;
 
-      optStr = k: v:
-        if v == null then null
-        else "  <key>${k}</key><string>${xmlEsc (toString v)}</string>";
+      optStr =
+        k: v: if v == null then null else "  <key>${k}</key><string>${xmlEsc (toString v)}</string>";
 
-      optBool = k: v:
-        "  <key>${k}</key><${if v then "true" else "false"}/>";
+      optBool = k: v: "  <key>${k}</key><${if v then "true" else "false"}/>";
 
-      optInt = k: v:
-        if v == null then null
-        else "  <key>${k}</key><integer>${toString v}</integer>";
+      optInt = k: v: if v == null then null else "  <key>${k}</key><integer>${toString v}</integer>";
 
       envBlock =
-        if s.environment == {} then [] else
-        [ "  <key>EnvironmentVariables</key>" "  <dict>" ]
-        ++ lib.mapAttrsToList
-            (k: v: "    <key>${xmlEsc k}</key><string>${xmlEsc (toString v)}</string>")
-            s.environment
-        ++ [ "  </dict>" ];
+        if s.environment == { } then
+          [ ]
+        else
+          [
+            "  <key>EnvironmentVariables</key>"
+            "  <dict>"
+          ]
+          ++ lib.mapAttrsToList (
+            k: v: "    <key>${xmlEsc k}</key><string>${xmlEsc (toString v)}</string>"
+          ) s.environment
+          ++ [ "  </dict>" ];
 
       mainLines = [
         ''<?xml version="1.0" encoding="UTF-8"?>''
@@ -150,13 +153,15 @@ let
         "  <key>Label</key><string>${xmlEsc label}</string>"
         "  <key>ProgramArguments</key>"
         "  <array>"
-      ] ++ argvLines ++ [
+      ]
+      ++ argvLines
+      ++ [
         "  </array>"
         (optBool "KeepAlive" s.launchd.keepAlive)
         (optBool "RunAtLoad" s.launchd.runAtLoad)
-      ] ++ (lib.optional s.launchd.abandonProcessGroup
-              (optBool "AbandonProcessGroup" true))
-        ++ [
+      ]
+      ++ (lib.optional s.launchd.abandonProcessGroup (optBool "AbandonProcessGroup" true))
+      ++ [
         (optStr "UserName" s.user)
         (optStr "GroupName" s.group)
         (optStr "WorkingDirectory" s.workingDirectory)
@@ -164,82 +169,120 @@ let
         (optStr "StandardErrorPath" s.stderr)
         (optStr "ProcessType" s.launchd.processType)
         (optInt "ThrottleInterval" s.launchd.throttleInterval)
-      ] ++ envBlock ++ [
+      ]
+      ++ envBlock
+      ++ [
         "</dict>"
         "</plist>"
       ];
 
       kept = builtins.filter (l: l != null) mainLines;
       content = lib.concatStringsSep "\n" kept + "\n";
-    in {
+    in
+    {
       filename = "${label}.plist";
       content = content;
       label = label;
       name = s.name;
     };
 
-  # ---------- windows (sc.exe) ----------
-
-  renderWindowsInstall = raw: { exeRelative ? null }:
+  # Returns service identity values used by both the .bat shim and native
+  # MSI <ServiceInstall>. Both paths must agree on these names or upgrades
+  # mismatch.
+  windowsServiceFields =
+    raw:
     let
       s = normalize raw;
       svcName = if s.windows.serviceName != null then s.windows.serviceName else s.name;
       display =
-        if s.windows.displayName != null then s.windows.displayName
-        else if s.description != "" then s.description
-        else svcName;
-      depends =
-        if s.windows.depends == [] then ""
-        else "depend= " + lib.concatStringsSep "/" s.windows.depends + " ";
-
-      # Parse `s.exec` as "<binary> [<args>...]" and rebuild it so the binary
-      # path becomes %~dp0<exeRelative> when supplied.
+        if s.windows.displayName != null then
+          s.windows.displayName
+        else if s.description != "" then
+          s.description
+        else
+          svcName;
       execTokens = builtins.filter (x: x != "") (lib.splitString " " s.exec);
       execArgs = lib.concatStringsSep " " (builtins.tail execTokens);
+    in
+    {
+      inherit svcName display;
+      inherit (s)
+        description
+        startAtBoot
+        environment
+        user
+        group
+        windows
+        ;
+      args = execArgs;
+    };
+
+  renderWindowsInstall =
+    raw:
+    {
+      exeRelative ? null,
+    }:
+    let
+      f = windowsServiceFields raw;
+      depends =
+        if f.windows.depends == [ ] then
+          ""
+        else
+          "depend= " + lib.concatStringsSep "/" f.windows.depends + " ";
       fullBinPath =
-        if exeRelative != null
-        then "%~dp0${exeRelative}" + (lib.optionalString (execArgs != "") " ${execArgs}")
-        else s.exec;
-      # sc.exe wants the *entire* command line — binary + args — as a single
-      # quoted string after binPath=.
+        if exeRelative != null then
+          "%~dp0${exeRelative}" + (lib.optionalString (f.args != "") " ${f.args}")
+        else
+          (normalize raw).exec;
+      # sc.exe needs the full command-line as a single quoted string after binPath=.
       binPathQuoted = ''"${fullBinPath}"'';
-      startCmd = if s.startAtBoot then ''sc start "${svcName}"'' else "";
-    in ''
-      sc create "${svcName}" binPath= ${binPathQuoted} start= ${s.windows.start} ^
-        DisplayName= "${display}" obj= ${s.windows.account} ^
-        error= ${s.windows.errorControl} ${depends}
-      ${lib.optionalString (s.description != "") ''sc description "${svcName}" "${s.description}"''}
+      startCmd = if f.startAtBoot then ''sc start "${f.svcName}"'' else "";
+    in
+    ''
+      sc create "${f.svcName}" binPath= ${binPathQuoted} start= ${f.windows.start} ^
+        DisplayName= "${f.display}" obj= ${f.windows.account} ^
+        error= ${f.windows.errorControl} ${depends}
+      ${lib.optionalString (f.description != "") ''sc description "${f.svcName}" "${f.description}"''}
       ${startCmd}
     '';
 
-  renderWindowsUninstall = raw:
+  renderWindowsUninstall =
+    raw:
     let
-      s = normalize raw;
-      svcName = if s.windows.serviceName != null then s.windows.serviceName else s.name;
-    in ''
-      sc stop "${svcName}" 1>nul 2>nul
-      sc delete "${svcName}"
+      f = windowsServiceFields raw;
+    in
+    ''
+      sc stop "${f.svcName}" 1>nul 2>nul
+      sc delete "${f.svcName}"
     '';
 
-  # Aggregate helpers — render all of `services` for a given OS.
   renderAllSystemd = services: map renderSystemd services;
   renderAllLaunchd = services: map renderLaunchd services;
 
-  renderWindowsBundleBat = services: { exeRelative ? null }:
-    if services == [] then null else ''
-      @echo off
-      rem nix-bundle-app: install Windows services
-      ${lib.concatMapStringsSep "\n"
-        (s: renderWindowsInstall s { inherit exeRelative; })
-        services}
-    '';
+  renderWindowsBundleBat =
+    services:
+    {
+      exeRelative ? null,
+    }:
+    if services == [ ] then
+      null
+    else
+      ''
+        @echo off
+        rem nix-bundle-app: install Windows services
+        ${lib.concatMapStringsSep "\n" (s: renderWindowsInstall s { inherit exeRelative; }) services}
+      '';
 
-  renderWindowsUninstallBat = services:
-    if services == [] then null else ''
-      @echo off
-      rem nix-bundle-app: uninstall Windows services
-      ${lib.concatMapStringsSep "\n" renderWindowsUninstall services}
-    '';
+  renderWindowsUninstallBat =
+    services:
+    if services == [ ] then
+      null
+    else
+      ''
+        @echo off
+        rem nix-bundle-app: uninstall Windows services
+        ${lib.concatMapStringsSep "\n" renderWindowsUninstall services}
+      '';
 in
 {
   inherit
@@ -248,6 +291,7 @@ in
     renderLaunchd
     renderWindowsInstall
     renderWindowsUninstall
+    windowsServiceFields
     renderAllSystemd
     renderAllLaunchd
     renderWindowsBundleBat

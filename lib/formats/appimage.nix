@@ -1,4 +1,14 @@
-{ pkgs, lib, deps, desktop, drv, format, meta, target, ... }:
+{
+  pkgs,
+  lib,
+  deps,
+  desktop,
+  drv,
+  format,
+  meta,
+  target,
+  ...
+}:
 
 let
   outFile = "${meta.name}-${meta.version}-${target.arch}.AppImage";
@@ -9,14 +19,20 @@ let
   defaultRuntime =
     let
       url = "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-${target.arch}";
-      sha = {
-        "x86_64"  = "1rbp65a2fd879l8gylhkb0wx679lbadgl7y0g6p9b0sn8z79shd2";
-        "aarch64" = "118c57yj0fz2nph3y4jasssdhsbs0ivsk91f6i32w2pjbg0sh9vz";
-      }.${target.arch} or null;
+      sha =
+        {
+          "x86_64" = "1rbp65a2fd879l8gylhkb0wx679lbadgl7y0g6p9b0sn8z79shd2";
+          "aarch64" = "118c57yj0fz2nph3y4jasssdhsbs0ivsk91f6i32w2pjbg0sh9vz";
+        }
+        .${target.arch} or null;
     in
-      if sha == null
-      then throw "nix-bundle-app: no pinned AppImage runtime hash for arch '${target.arch}'. Supply meta.appImageRuntime."
-      else pkgs.fetchurl { inherit url; sha256 = sha; };
+    if sha == null then
+      throw "nix-bundle-app: no pinned AppImage runtime hash for arch '${target.arch}'. Supply meta.appImageRuntime."
+    else
+      pkgs.fetchurl {
+        inherit url;
+        sha256 = sha;
+      };
 
   runtime = if meta.appImageRuntime != null then meta.appImageRuntime else defaultRuntime;
 
@@ -24,16 +40,17 @@ let
   # user-supplied entry; otherwise synthesize a minimal one from the
   # package's name + summary so the AppImage is still spec-compliant.
   primaryEntry =
-    if meta.desktopEntries != [ ]
-    then builtins.head meta.desktopEntries
-    else {
-      name = meta.name;
-      exec = "${meta.name} %F";
-      comment = if meta.summary != "" then meta.summary else meta.name;
-      icon = meta.name;
-      categories = [ "Utility" ];
-      terminal = meta.appImageTerminal;
-    };
+    if meta.desktopEntries != [ ] then
+      builtins.head meta.desktopEntries
+    else
+      {
+        name = meta.name;
+        exec = "${meta.name} %F";
+        comment = if meta.summary != "" then meta.summary else meta.name;
+        icon = meta.name;
+        categories = [ "Utility" ];
+        terminal = meta.appImageTerminal;
+      };
 
   renderedDesktop = desktop.renderEntry primaryEntry;
 
@@ -50,7 +67,13 @@ pkgs.stdenv.mkDerivation {
   name = outFile;
   dontUnpack = true;
   nativeBuildInputs = with pkgs; [
-    squashfsTools coreutils file gnugrep rsync patchelf gnused
+    squashfsTools
+    coreutils
+    file
+    gnugrep
+    rsync
+    patchelf
+    gnused
   ];
 
   buildCommand = ''
@@ -80,7 +103,6 @@ pkgs.stdenv.mkDerivation {
     cp ${pkgs.writeShellScript "AppRun" appRun} "$AppDir/AppRun"
     chmod +x "$AppDir/AppRun"
 
-    # Build squashfs of AppDir
     mksquashfs "$AppDir" payload.squashfs \
       -root-owned -noappend -comp zstd -all-root \
       -no-progress -no-xattrs
@@ -90,5 +112,8 @@ pkgs.stdenv.mkDerivation {
     chmod +x "$out/${outFile}"
   '';
 
-  passthru = { info = meta; inherit target format runtime; };
+  passthru = {
+    info = meta;
+    inherit target format runtime;
+  };
 }

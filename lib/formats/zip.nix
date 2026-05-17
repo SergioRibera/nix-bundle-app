@@ -1,4 +1,12 @@
-{ pkgs, deps, drv, format, meta, target, ... }:
+{
+  pkgs,
+  deps,
+  drv,
+  format,
+  meta,
+  target,
+  ...
+}:
 
 let
   isWindows = target.os == "windows";
@@ -36,14 +44,24 @@ let
   '';
 
   prep =
-    if isWindows then windowsPrep
-    else if isDarwin then darwinPrep
-    else linuxPrep;
+    if isWindows then
+      windowsPrep
+    else if isDarwin then
+      darwinPrep
+    else
+      linuxPrep;
 in
 pkgs.stdenv.mkDerivation {
   name = outFile;
   dontUnpack = true;
-  nativeBuildInputs = [ pkgs.zip pkgs.rsync pkgs.coreutils pkgs.patchelf pkgs.file pkgs.gnugrep ];
+  nativeBuildInputs = [
+    pkgs.zip
+    pkgs.rsync
+    pkgs.coreutils
+    pkgs.patchelf
+    pkgs.file
+    pkgs.gnugrep
+  ];
 
   buildCommand = ''
     ${prep}
@@ -51,5 +69,8 @@ pkgs.stdenv.mkDerivation {
     ( cd "$PWD" && ${pkgs.zip}/bin/zip -r -9 "$out/${outFile}" "${meta.name}-${meta.version}" )
   '';
 
-  passthru = { info = meta; inherit target format; };
+  passthru = {
+    info = meta;
+    inherit target format;
+  };
 }

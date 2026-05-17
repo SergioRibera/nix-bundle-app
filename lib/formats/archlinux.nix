@@ -1,10 +1,30 @@
-{ pkgs, lib, deps, utils, desktop, services, drv, format, meta, target }:
+{
+  pkgs,
+  lib,
+  deps,
+  utils,
+  desktop,
+  services,
+  drv,
+  format,
+  meta,
+  target,
+}:
 
 let
-  common = import ./_common-linux.nix { inherit pkgs lib deps utils desktop services; };
+  common = import ./_common-linux.nix {
+    inherit
+      pkgs
+      lib
+      deps
+      utils
+      desktop
+      services
+      ;
+  };
   pkgArch = meta.archArch;
-  reqs = meta.depends.archlinux or [];
-  optDeps = meta.depends.archlinuxOptional or [];
+  reqs = meta.depends.archlinux or [ ];
+  optDeps = meta.depends.archlinuxOptional or [ ];
 
   installScript = lib.optionalString (common.hasServices meta) ''
     post_install() {
@@ -24,13 +44,26 @@ in
 pkgs.stdenv.mkDerivation {
   name = "${meta.name}-${meta.version}-1-${pkgArch}.pkg.tar.zst";
   dontUnpack = true;
-  nativeBuildInputs = with pkgs; [ libarchive zstd gzip patchelf file gnugrep rsync coreutils gnused ];
+  nativeBuildInputs = with pkgs; [
+    libarchive
+    zstd
+    gzip
+    patchelf
+    file
+    gnugrep
+    rsync
+    coreutils
+    gnused
+  ];
 
   buildCommand = ''
     stage=$PWD/stage
     mkdir -p "$stage"
 
-    ${common.stageLinux { inherit drv meta target; stage = "$stage"; }}
+    ${common.stageLinux {
+      inherit drv meta target;
+      stage = "$stage";
+    }}
 
     instSize=$(${pkgs.coreutils}/bin/du -sb "$stage" | ${pkgs.coreutils}/bin/cut -f1)
     builddate=$(date +%s)
@@ -57,7 +90,6 @@ pkgs.stdenv.mkDerivation {
       ${pkgs.gnused}/bin/sed -i 's/install = .*/&\ninstall = ${meta.name}.install/' "$stage/.PKGINFO" || true
     ''}
 
-    # Build .MTREE (gzipped bsdtar mtree)
     (
       cd "$stage"
       LANG=C bsdtar -cf - --format=mtree \
@@ -73,7 +105,6 @@ pkgs.stdenv.mkDerivation {
         | ${pkgs.zstd}/bin/zstd -19 -T0 -o "$out_pkg"
     )
 
-    # Also emit PKGBUILD for users who want to rebuild from source.
     cat > "$out/PKGBUILD" <<EOF
     # Maintainer: ${meta.maintainer}
     pkgname=${meta.name}
@@ -84,7 +115,9 @@ pkgs.stdenv.mkDerivation {
     url='${meta.homepage}'
     license=('${meta.license}')
     depends=(${lib.concatMapStringsSep " " (d: "'" + d + "'") reqs})
-    ${lib.optionalString (optDeps != []) "optdepends=(${lib.concatMapStringsSep " " (d: "'" + d + "'") optDeps})"}
+    ${lib.optionalString (optDeps != [ ])
+      "optdepends=(${lib.concatMapStringsSep " " (d: "'" + d + "'") optDeps})"
+    }
     source=("${meta.name}-${meta.version}.tar.gz")
     sha256sums=('SKIP')
 
@@ -97,5 +130,8 @@ pkgs.stdenv.mkDerivation {
     ${pkgs.gnused}/bin/sed -i 's/^    //' "$out/PKGBUILD"
   '';
 
-  passthru = { info = meta; inherit target format; };
+  passthru = {
+    info = meta;
+    inherit target format;
+  };
 }

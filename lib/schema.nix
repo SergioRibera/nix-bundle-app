@@ -1,13 +1,11 @@
-# Schema for `info` — the user-facing bundle metadata struct.
-#
-# Consumed in two places:
-#   - lib/info.nix      → lib.evalModules to validate + apply defaults
-#   - lib/docs.nix      → pkgs.nixosOptionsDoc to render docs/options.md
-#
-# All option declarations live here so they are documented once. Cross-field
-# consistency checks live in `config.assertions`; `lib/info.nix` aborts the
-# evaluation if any assertion is false.
-{ lib, drv, target, format, config, ... }:
+{
+  lib,
+  drv,
+  target,
+  format,
+  config,
+  ...
+}:
 
 let
   inherit (lib) mkOption types literalExpression;
@@ -45,7 +43,11 @@ let
         example = "/opt/my-app/bin/my-app %F";
       };
       type = mkOption {
-        type = types.enum [ "Application" "Link" "Directory" ];
+        type = types.enum [
+          "Application"
+          "Link"
+          "Directory"
+        ];
         default = "Application";
         description = "Entry kind. `Type=` field.";
       };
@@ -81,7 +83,10 @@ let
         type = types.listOf types.str;
         default = [ "Utility" ];
         description = "XDG menu categories. Becomes `Categories=` (joined with `;`).";
-        example = [ "Development" "IDE" ];
+        example = [
+          "Development"
+          "IDE"
+        ];
       };
       keywords = mkOption {
         type = types.listOf types.str;
@@ -149,7 +154,14 @@ let
         '';
       };
       extra = mkOption {
-        type = types.attrsOf (types.oneOf [ types.str types.bool types.int (types.listOf types.str) ]);
+        type = types.attrsOf (
+          types.oneOf [
+            types.str
+            types.bool
+            types.int
+            (types.listOf types.str)
+          ]
+        );
         default = { };
         description = "Arbitrary extra keys to embed in `[Desktop Entry]`.";
         example = literalExpression ''{ "X-AppImage-Version" = "1.0"; }'';
@@ -215,7 +227,14 @@ let
         description = "Plist `ThrottleInterval` (seconds).";
       };
       processType = mkOption {
-        type = types.nullOr (types.enum [ "Background" "Standard" "Adaptive" "Interactive" ]);
+        type = types.nullOr (
+          types.enum [
+            "Background"
+            "Standard"
+            "Adaptive"
+            "Interactive"
+          ]
+        );
         default = null;
         description = "Plist `ProcessType`.";
       };
@@ -235,17 +254,30 @@ let
         description = "Friendly display name (services.msc).";
       };
       account = mkOption {
-        type = types.enum [ "LocalSystem" "LocalService" "NetworkService" ];
+        type = types.enum [
+          "LocalSystem"
+          "LocalService"
+          "NetworkService"
+        ];
         default = "LocalSystem";
         description = "Service account (`obj=`).";
       };
       start = mkOption {
-        type = types.enum [ "auto" "demand" "disabled" ];
+        type = types.enum [
+          "auto"
+          "demand"
+          "disabled"
+        ];
         default = "auto";
         description = "Startup type (`start=`).";
       };
       errorControl = mkOption {
-        type = types.enum [ "normal" "severe" "critical" "ignore" ];
+        type = types.enum [
+          "normal"
+          "severe"
+          "critical"
+          "ignore"
+        ];
         default = "normal";
         description = "Error-control level (`error=`).";
       };
@@ -293,10 +325,17 @@ let
         type = types.attrsOf (types.either types.str types.int);
         default = { };
         description = "Environment variables for the service.";
-        example = { LOG_LEVEL = "info"; PORT = 8080; };
+        example = {
+          LOG_LEVEL = "info";
+          PORT = 8080;
+        };
       };
       restart = mkOption {
-        type = types.enum [ "always" "on-failure" "no" ];
+        type = types.enum [
+          "always"
+          "on-failure"
+          "no"
+        ];
         default = "on-failure";
         description = "Restart policy.";
       };
@@ -326,7 +365,13 @@ let
         description = "systemd soft-dependency constraint.";
       };
       type = mkOption {
-        type = types.enum [ "simple" "forking" "oneshot" "notify" "dbus" ];
+        type = types.enum [
+          "simple"
+          "forking"
+          "oneshot"
+          "notify"
+          "dbus"
+        ];
         default = "simple";
         description = "systemd service Type.";
       };
@@ -457,11 +502,15 @@ in
     license = mkOption {
       type = types.str;
       default =
-        let l = drv.meta.license or null; in
-        if l == null then "Unspecified"
-        else if builtins.isList l
-        then lib.concatMapStringsSep " AND " (x: x.spdxId or x.fullName or (toString x)) l
-        else l.spdxId or l.fullName or (toString l);
+        let
+          l = drv.meta.license or null;
+        in
+        if l == null then
+          "Unspecified"
+        else if builtins.isList l then
+          lib.concatMapStringsSep " AND " (x: x.spdxId or x.fullName or (toString x)) l
+        else
+          l.spdxId or l.fullName or (toString l);
       defaultText = literalExpression "derived from drv.meta.license";
       description = "License identifier — SPDX preferred.";
       example = "MIT";
@@ -589,12 +638,14 @@ in
     };
 
     assertions = mkOption {
-      type = types.listOf (types.submodule {
-        options = {
-          assertion = mkOption { type = types.bool; };
-          message = mkOption { type = types.str; };
-        };
-      });
+      type = types.listOf (
+        types.submodule {
+          options = {
+            assertion = mkOption { type = types.bool; };
+            message = mkOption { type = types.str; };
+          };
+        }
+      );
       default = [ ];
       internal = true;
       visible = false;
@@ -613,14 +664,17 @@ in
         message = "info.version must be a non-empty string.";
       }
       {
-        assertion = config.appImageRuntime != null || format != "appimage"
-                    || target.arch == "x86_64" || target.arch == "aarch64";
+        assertion =
+          config.appImageRuntime != null
+          || format != "appimage"
+          || target.arch == "x86_64"
+          || target.arch == "aarch64";
         message =
           "AppImage runtime auto-fetch is only pinned for x86_64 and aarch64. "
           + "Supply info.appImageRuntime for arch='${target.arch}'.";
       }
       {
-        assertion = config.services == [] || format != "appimage";
+        assertion = config.services == [ ] || format != "appimage";
         message =
           "info.services has no effect for the AppImage format — AppImages are "
           + "single-binary user apps, not system services. Use a deb/rpm/archlinux "
@@ -639,8 +693,11 @@ in
         message = "Every entry in info.desktopEntries must set non-empty `name` and `exec`.";
       }
       {
-        assertion = config.msiUpgradeCode == null
-                    || builtins.match "[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}" config.msiUpgradeCode != null;
+        assertion =
+          config.msiUpgradeCode == null
+          ||
+            builtins.match "[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}" config.msiUpgradeCode
+            != null;
         message =
           "info.msiUpgradeCode must be a GUID of shape "
           + "'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX' (got '${toString config.msiUpgradeCode}').";

@@ -1,19 +1,10 @@
-# Auto-generate the options reference from lib/schema.nix.
-#
-# We evaluate the same schema used by `info.normalize` (against a stand-in
-# `drv`/`target`/`format` so drv-derived defaults resolve) and feed the
-# resulting `options` tree to `pkgs.nixosOptionsDoc`. The output is a
-# self-contained derivation with `share/doc/nix-bundle-app/{options.md,options.json}`
-# that the docs CI job copies into `docs/`.
 { pkgs }:
 
 let
   lib = pkgs.lib;
 
-  # Minimal stand-in derivation. `nixosOptionsDoc` only renders option
-  # *declarations* — defaults are shown as `defaultText` when supplied,
-  # so this fake drv only needs the attrs that participate in literal
-  # default expressions (drv.pname / drv.version / drv.meta.*).
+  # Stand-in drv: nixosOptionsDoc renders declarations, not values, so only
+  # the attrs referenced by literal default expressions need to exist.
   placeholderDrv = {
     pname = "app";
     version = "0.0.0";
@@ -31,26 +22,29 @@ let
       {
         _module.args = {
           drv = placeholderDrv;
-          target = { arch = "x86_64"; os = "linux"; };
+          target = {
+            arch = "x86_64";
+            os = "linux";
+          };
           format = "deb";
         };
       }
     ];
   };
 
-  # Hide framework-internal options (`_module.*`) and our private
-  # `assertions` plumbing from the public reference.
   publicOptions = removeAttrs evaluated.options [ "_module" ];
 
   doc = pkgs.nixosOptionsDoc {
     options = publicOptions;
-    # nixos-render-docs hardcodes nixpkgs as the source-link base; rather
-    # than chase a broken upstream URL, drop the `Declared by:` line — the
-    # generated header already documents the schema's origin.
-    transformOptions = opt: opt // {
-      declarations = [ ];
-      visible = opt.visible && !(opt.internal or false);
-    };
+    # nixos-render-docs hardcodes nixpkgs as source-link base; drop the
+    # `Declared by:` line so the rendered page doesn't point at a wrong repo.
+    transformOptions =
+      opt:
+      opt
+      // {
+        declarations = [ ];
+        visible = opt.visible && !(opt.internal or false);
+      };
     warningsAreErrors = false;
   };
 

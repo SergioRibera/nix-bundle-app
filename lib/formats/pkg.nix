@@ -1,11 +1,35 @@
-{ pkgs, lib, deps, utils, desktop, services, drv, format, meta, target }:
+{
+  pkgs,
+  lib,
+  deps,
+  utils,
+  desktop,
+  services,
+  drv,
+  format,
+  meta,
+  target,
+}:
 
 let
-  appBundle = import ./app.nix { inherit pkgs lib deps utils desktop services drv format meta target; };
+  appBundle = import ./app.nix {
+    inherit
+      pkgs
+      lib
+      deps
+      utils
+      desktop
+      services
+      drv
+      format
+      meta
+      target
+      ;
+  };
   outFile = "${meta.name}-${meta.version}-${utils.darwinArch target.arch}.pkg";
 
   renderedServices = services.renderAllLaunchd meta.services;
-  hasServices = renderedServices != [];
+  hasServices = renderedServices != [ ];
 
   # When services are present we need files at two roots (/Applications and
   # /Library/LaunchDaemons), so we set install-location="/" and lay them out
@@ -23,7 +47,9 @@ let
       <bundle-version>
         <bundle id="${meta.bundleId}"
                 CFBundleIdentifier="${meta.bundleId}"
-                path="${if hasServices then "./Applications/${meta.name}.app" else "./${meta.name}.app"}"
+                path="${
+                  if hasServices then "./Applications/${meta.name}.app" else "./${meta.name}.app"
+                }"
                 CFBundleVersion="${meta.version}"
                 CFBundleShortVersionString="${meta.version}"/>
       </bundle-version>
@@ -47,9 +73,16 @@ in
 pkgs.stdenv.mkDerivation {
   name = outFile;
   dontUnpack = true;
-  nativeBuildInputs =
-    [ pkgs.coreutils pkgs.gnused pkgs.gzip pkgs.cpio ]
-    ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.bomutils pkgs.xar ];
+  nativeBuildInputs = [
+    pkgs.coreutils
+    pkgs.gnused
+    pkgs.gzip
+    pkgs.cpio
+  ]
+  ++ lib.optionals pkgs.stdenv.isLinux [
+    pkgs.bomutils
+    pkgs.xar
+  ];
 
   buildCommand =
     let
@@ -57,17 +90,22 @@ pkgs.stdenv.mkDerivation {
         work=$PWD/build
         root=$work/root
         mkdir -p "$root"
-        ${if hasServices then ''
-          mkdir -p "$root/Applications" "$root/Library/LaunchDaemons"
-          cp -r ${appBundle}/${meta.name}.app "$root/Applications/"
-          ${lib.concatMapStringsSep "\n" (p: ''
-            cp ${pkgs.writeText p.filename p.content} \
-               "$root/Library/LaunchDaemons/${p.filename}"
-            chmod 644 "$root/Library/LaunchDaemons/${p.filename}"
-          '') renderedServices}
-        '' else ''
-          cp -r ${appBundle}/${meta.name}.app "$root/"
-        ''}
+        ${
+          if hasServices then
+            ''
+              mkdir -p "$root/Applications" "$root/Library/LaunchDaemons"
+              cp -r ${appBundle}/${meta.name}.app "$root/Applications/"
+              ${lib.concatMapStringsSep "\n" (p: ''
+                cp ${pkgs.writeText p.filename p.content} \
+                   "$root/Library/LaunchDaemons/${p.filename}"
+                chmod 644 "$root/Library/LaunchDaemons/${p.filename}"
+              '') renderedServices}
+            ''
+          else
+            ''
+              cp -r ${appBundle}/${meta.name}.app "$root/"
+            ''
+        }
         chmod -R u+w "$root"
       '';
 
@@ -127,7 +165,10 @@ pkgs.stdenv.mkDerivation {
         fi
       '';
     in
-      if pkgs.stdenv.isDarwin then darwinBuild else linuxBuild;
+    if pkgs.stdenv.isDarwin then darwinBuild else linuxBuild;
 
-  passthru = { info = meta; inherit target format appBundle; };
+  passthru = {
+    info = meta;
+    inherit target format appBundle;
+  };
 }

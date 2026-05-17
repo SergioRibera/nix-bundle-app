@@ -1,7 +1,31 @@
-{ pkgs, lib, deps, utils, desktop, services, drv, format, meta, target }:
+{
+  pkgs,
+  lib,
+  deps,
+  utils,
+  desktop,
+  services,
+  drv,
+  format,
+  meta,
+  target,
+}:
 
 let
-  appBundle = import ./app.nix { inherit pkgs lib deps utils desktop services drv format meta target; };
+  appBundle = import ./app.nix {
+    inherit
+      pkgs
+      lib
+      deps
+      utils
+      desktop
+      services
+      drv
+      format
+      meta
+      target
+      ;
+  };
   outFile = "${meta.name}-${meta.version}-${utils.darwinArch target.arch}.dmg";
 in
 pkgs.stdenv.mkDerivation {
@@ -9,9 +33,11 @@ pkgs.stdenv.mkDerivation {
   dontUnpack = true;
   # Linux: emit an HFS+ hybrid ISO that Finder mounts transparently.
   # darwin: defer to hdiutil for a real UDIF DMG.
-  nativeBuildInputs =
-    [ pkgs.coreutils pkgs.gnused ]
-    ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.xorriso ];
+  nativeBuildInputs = [
+    pkgs.coreutils
+    pkgs.gnused
+  ]
+  ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.xorriso ];
 
   buildCommand =
     let
@@ -45,7 +71,10 @@ pkgs.stdenv.mkDerivation {
         fi
       '';
     in
-      if pkgs.stdenv.isDarwin then darwinBuild else linuxBuild;
+    if pkgs.stdenv.isDarwin then darwinBuild else linuxBuild;
 
-  passthru = { info = meta; inherit target format appBundle; };
+  passthru = {
+    info = meta;
+    inherit target format appBundle;
+  };
 }
