@@ -1,0 +1,223 @@
+{ pkgs, bundler }:
+
+let
+  helloLinux = pkgs.hello;
+  helloWindows =
+    if pkgs.stdenv.isLinux
+    then pkgs.pkgsCross.mingwW64.hello
+    else pkgs.hello;
+
+  commonInfo = {
+    description = "GNU Hello, the canonical example program";
+    homepage = "https://www.gnu.org/software/hello/";
+    license = "GPL-3.0-or-later";
+    maintainer = "nix-bundle-app demo <noreply@example.com>";
+    summary = "Prints a friendly greeting";
+    longDescription = ''
+      GNU Hello is a program that produces a familiar, friendly greeting.
+      Repackaged by nix-bundle-app to demonstrate native installer generation.
+    '';
+  };
+
+  serviceInfo = commonInfo // {
+    desktopEntries = [
+      {
+        name = "Hello Demo";
+        exec = "/opt/hello/bin/hello %F";
+        comment = "Friendly greeter (demo of declarative bundle metadata)";
+        icon = "hello";
+        categories = [ "Utility" "Education" ];
+        keywords = [ "demo" "greeting" "hello" ];
+        terminal = false;
+        actions = {
+          "Verbose" = { name = "Run verbose"; exec = "/opt/hello/bin/hello --verbose"; };
+        };
+      }
+    ];
+    services = [
+      {
+        name = "hello-agent";
+        description = "Hello background greeter";
+        exec = "/opt/hello/bin/hello --daemon";
+        user = "hello";
+        environment = { LOG_LEVEL = "info"; HELLO_INTERVAL = "60"; };
+        restart = "always";
+        restartSec = 10;
+        after = [ "network-online.target" ];
+
+        windows = {
+          serviceName = "HelloAgent";
+          displayName = "Hello Greeter Agent";
+          start = "auto";
+        };
+        launchd = {
+          keepAlive = true;
+          runAtLoad = true;
+          processType = "Background";
+        };
+      }
+    ];
+  };
+in
+{
+  hello-deb = bundler.bundle {
+    drv = helloLinux;
+    format = "deb";
+    info = commonInfo;
+  };
+
+  hello-rpm = bundler.bundle {
+    drv = helloLinux;
+    format = "rpm";
+    info = commonInfo;
+  };
+
+  hello-archlinux = bundler.bundle {
+    drv = helloLinux;
+    format = "archlinux";
+    info = commonInfo;
+  };
+
+  hello-tar-gz = bundler.bundle {
+    drv = helloLinux;
+    format = "tar.gz";
+    info = commonInfo;
+  };
+
+  hello-tar-xz = bundler.bundle {
+    drv = helloLinux;
+    format = "tar.xz";
+    info = commonInfo;
+  };
+
+  hello-zip = bundler.bundle {
+    drv = helloLinux;
+    format = "zip";
+    info = commonInfo;
+  };
+
+  hello-app = bundler.bundle {
+    drv = helloLinux;
+    format = "app";
+    info = commonInfo;
+    target = { arch = "x86_64"; os = "darwin"; };
+  };
+
+  hello-brew = bundler.bundle {
+    drv = helloLinux;
+    format = "brew";
+    info = commonInfo // { downloadUrl = "https://example.com/releases/hello.tar.gz"; };
+    target = { arch = "x86_64"; os = "darwin"; };
+  };
+
+  hello-dmg =
+    if pkgs.stdenv.isLinux || pkgs.stdenv.isDarwin
+    then bundler.bundle {
+      drv = helloLinux;
+      format = "dmg";
+      info = commonInfo;
+      target = { arch = "x86_64"; os = "darwin"; };
+    }
+    else null;
+
+  hello-nsis = bundler.bundle {
+    drv = helloWindows;
+    format = "nsis";
+    info = commonInfo;
+    target = { arch = "x86_64"; os = "windows"; };
+  };
+
+  hello-windows-zip = bundler.bundle {
+    drv = helloWindows;
+    format = "zip";
+    info = commonInfo;
+    target = { arch = "x86_64"; os = "windows"; };
+  };
+
+  hello-appimage = bundler.bundle {
+    drv = helloLinux;
+    format = "appimage";
+    info = commonInfo;
+  };
+
+  hello-pkg = bundler.bundle {
+    drv = helloLinux;
+    format = "pkg";
+    info = commonInfo;
+    target = { arch = "x86_64"; os = "darwin"; };
+  };
+
+  hello-msi = bundler.bundle {
+    drv = helloWindows;
+    format = "msi";
+    info = commonInfo;
+    target = { arch = "x86_64"; os = "windows"; };
+  };
+
+  hello-all-linux = bundler.bundleAll {
+    drv = helloLinux;
+    formats = [ "deb" "rpm" "archlinux" "appimage" "tar.gz" "tar.xz" "zip" ];
+    info = commonInfo;
+  };
+
+  hello-all-windows = bundler.bundleAll {
+    drv = helloWindows;
+    formats = [ "nsis" "msi" "zip" ];
+    info = commonInfo;
+    target = { arch = "x86_64"; os = "windows"; };
+  };
+
+  hello-all-darwin = bundler.bundleAll {
+    drv = helloLinux;
+    formats = [ "app" "dmg" "pkg" "brew" "tar.gz" ];
+    info = commonInfo;
+    target = { arch = "x86_64"; os = "darwin"; };
+  };
+
+  # ── Demo: declarative desktop entry + cross-OS service ───────────────────
+  #
+  # Single declarative info, multiple OS targets, native artifacts for each:
+  #
+  #   nix build .#hello-service-deb     # systemd unit registered by dpkg
+  #   nix build .#hello-service-pkg     # launchd plist → /Library/LaunchDaemons
+  #   nix build .#hello-service-nsis    # Windows Service via sc.exe
+
+  hello-service-deb = bundler.bundle {
+    drv = helloLinux; format = "deb"; info = serviceInfo;
+  };
+  hello-service-rpm = bundler.bundle {
+    drv = helloLinux; format = "rpm"; info = serviceInfo;
+  };
+  hello-service-archlinux = bundler.bundle {
+    drv = helloLinux; format = "archlinux"; info = serviceInfo;
+  };
+  # NB: `appimage` + `services` is now a schema-level error — AppImage is for
+  # user-mode single-binary apps, not for daemons. Use deb/rpm/archlinux for
+  # service installation on linux.
+  hello-service-app = bundler.bundle {
+    drv = helloLinux; format = "app"; info = serviceInfo;
+    target = { arch = "x86_64"; os = "darwin"; };
+  };
+  hello-service-pkg = bundler.bundle {
+    drv = helloLinux; format = "pkg"; info = serviceInfo;
+    target = { arch = "x86_64"; os = "darwin"; };
+  };
+  hello-service-nsis = bundler.bundle {
+    drv = helloWindows; format = "nsis"; info = serviceInfo;
+    target = { arch = "x86_64"; os = "windows"; };
+  };
+  hello-service-msi = bundler.bundle {
+    drv = helloWindows; format = "msi"; info = serviceInfo;
+    target = { arch = "x86_64"; os = "windows"; };
+  };
+
+  # Brew on linux: now allowed.
+  hello-brew-linux = bundler.bundle {
+    drv = helloLinux;
+    format = "brew";
+    info = commonInfo // {
+      downloadUrl = "https://example.com/releases/hello-linux.tar.gz";
+    };
+    target = { arch = "x86_64"; os = "linux"; };
+  };
+}
