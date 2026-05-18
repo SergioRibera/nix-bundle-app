@@ -8,7 +8,7 @@ let
   services = import ./services.nix { inherit lib utils; };
   infoLib = import ./info.nix { inherit lib utils; };
   deps = import ./deps.nix { inherit pkgs lib utils; };
-  signing = import ./signing.nix { inherit lib; };
+  signing = import ./signing.nix { inherit pkgs lib; };
 
   formatModules = {
     deb = import ./formats/deb.nix;
@@ -70,21 +70,25 @@ let
           requiredOS == "any" || requiredOS == t.os
         ) "nix-bundle-app: format '${format}' requires os='${requiredOS}', got os='${t.os}'.";
         infoLib.normalize info drv t format;
+      built = mod {
+        inherit
+          pkgs
+          lib
+          deps
+          utils
+          desktop
+          services
+          signing
+          drv
+          format
+          meta
+          ;
+        target = t;
+      };
     in
-    mod {
-      inherit
-        pkgs
-        lib
-        deps
-        utils
-        desktop
-        services
-        signing
-        drv
-        format
-        meta
-        ;
-      target = t;
+    signing.wrapAutoSign {
+      inherit meta format;
+      bundle = built;
     };
 
   bundleAll =

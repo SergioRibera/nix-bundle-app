@@ -130,6 +130,26 @@ P12_PASSWORD="$(cat ~/.secrets/p12.pw)" ./result/sign.sh           # darwin/wind
 GPG_KEY_ID=0xABCDEF1234567890           ./result/sign.sh           # linux
 ```
 
+### Auto-sign (no manual step)
+
+Set `info.signing.<os>.auto = true` to wrap the bundle in a `__impure = true` derivation that runs `sign.sh` immediately after the build. `nix build .#hello-deb` then produces an already-signed artifact — no `./result/sign.sh` invocation needed.
+
+```nix
+info.signing.linux = {
+  enable = true; auto = true; keyId = "0xABCDEF1234567890";
+};
+```
+
+```sh
+GPG_KEY_ID=0xABCDEF1234567890 nix build .#hello-deb     # one shot, signed
+```
+
+Caveats:
+- Requires `experimental-features = impure-derivations ca-derivations` in your nix config.
+- Output is **not cached** — every build re-runs the signer.
+- Secrets are read from env vars at build time (not stored in `/nix/store`).
+- Unsigned bundle is still accessible via `result.passthru.unsignedBundle`.
+
 Signers used: `rcodesign` (macOS, cross-platform), `osslsigncode` (Authenticode), `dpkg-sig` / `rpmsign --addsign` (embedded GPG) or `gpg --detach-sign` (detached `.sig`).
 
 ## Caveats

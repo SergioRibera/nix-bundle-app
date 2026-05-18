@@ -1,4 +1,4 @@
-{ lib }:
+{ pkgs, lib }:
 
 # Codesigning helpers. Bundles ship unsigned out of the Nix sandbox (secrets
 # can't safely live in /nix/store). When `info.signing.<os>.enable = true`,
@@ -237,7 +237,113 @@ let
       if l.enable then gpgScript l artifactGlob else null
     else
       null;
+  formatPlatform =
+    format:
+    if format == "app" || format == "dmg" || format == "pkg" || format == "productbuild" then
+      "darwin"
+    else if format == "nsis" || format == "exe" || format == "msi" then
+      "windows"
+    else if format == "deb" || format == "rpm" || format == "archlinux" || format == "appimage" then
+      "linux"
+    else
+      null;
+
+  # Tools the auto-sign wrapper needs on PATH for each style of signer.
+  signerTools =
+    {
+      platform,
+      style,
+    }:
+    if platform == "darwin" then
+      [ pkgs.rcodesign ]
+    else if platform == "windows" then
+      [ pkgs.osslsigncode ]
+    else if platform == "linux" then
+      [ pkgs.gnupg ]
+      ++ (
+        if style == "embedded" then
+          [
+            pkgs.dpkg-sig
+            pkgs.rpm
+          ]
+        else
+          [ ]
+      )
+    else
+      [ ];
+
+  # Wrap a bundle derivation in an impure derivation that runs sign.sh
+  # right after the build, producing a pre-signed output. Returns the bundle
+  # unchanged if `auto` is not enabled for the relevant platform.
+  wrapAutoSign =
+    {
+      meta,
+      format,
+      bundle,
+    }:
+    let
+      platform = formatPlatform format;
+      enabled =
+        platform != null
+        && meta.signing.${platform}.enable or false
+        && meta.signing.${platform}.auto or false;
+      style = meta.signing.linux.style or "detached";
+      tools = signerTools { inherit platform style; };
+    in
+    if !enabled then
+      bundle
+    else
+      pkgs.stdenv.mkDerivation {
+        name = "${bundle.name}-signed";
+        dontUnpack = true;
+
+        # `__impure = true` requires `experimental-features =
+        # impure-derivations ca-derivations` in nix config. Output is not
+        # cached — every build re-runs the signer.
+        __impure = true;
+
+        # Pass secrets / cert paths through from the calling shell.
+        impureEnvVars = [
+          "P12_FILE"
+          "P12_PASSWORD"
+          "TEAM_ID"
+          "PKCS12_FILE"
+          "PKCS12_PASSWORD"
+          "TIMESTAMP_URL"
+          "GPG_KEY_ID"
+          "GNUPGHOME"
+          "GPG_TTY"
+          "HOME"
+        ];
+
+        nativeBuildInputs = tools ++ [
+          pkgs.coreutils
+          pkgs.bash
+        ];
+
+        buildCommand = ''
+          mkdir -p $out
+          cp -r --no-preserve=mode,ownership ${bundle}/. $out/
+          chmod -R u+w $out
+          if [ -x "$out/sign.sh" ]; then
+            ( cd $out && bash ./sign.sh )
+            rm -f $out/sign.sh
+          else
+            echo "warning: auto-sign enabled but no sign.sh produced — bundle left unsigned." >&2
+          fi
+        '';
+
+        passthru = (bundle.passthru or { }) // {
+          unsignedBundle = bundle;
+          signedAutomatically = true;
+        };
+      };
 in
 {
-  inherit pickScript emitSignScript;
+  inherit
+    pickScript
+    emitSignScript
+    wrapAutoSign
+    formatPlatform
+    ;
 }

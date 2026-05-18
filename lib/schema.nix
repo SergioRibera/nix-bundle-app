@@ -410,6 +410,18 @@ let
         default = false;
         description = "Generate a `sign.sh` next to darwin artifacts that drives `rcodesign`.";
       };
+      auto = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          If true, wrap the bundle in a `__impure = true` derivation that
+          runs the generated `sign.sh` automatically right after the build.
+          The resulting `nix build` output is already signed — no manual
+          step. Requires `experimental-features = impure-derivations
+          ca-derivations` in your nix config. Reads `P12_FILE` / `P12_PASSWORD`
+          / `TEAM_ID` from the calling shell at build time. Output is not cached.
+        '';
+      };
       p12File = mkOption {
         type = types.nullOr (types.either types.path types.str);
         default = null;
@@ -444,6 +456,15 @@ let
         default = false;
         description = "Generate a `sign.sh` next to windows artifacts that drives `osslsigncode`.";
       };
+      auto = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Auto-run `sign.sh` in an impure post-build derivation. Reads
+          `PKCS12_FILE` / `PKCS12_PASSWORD` / `TIMESTAMP_URL` from the
+          calling shell. Requires `experimental-features = impure-derivations`.
+        '';
+      };
       pkcs12File = mkOption {
         type = types.nullOr (types.either types.path types.str);
         default = null;
@@ -473,6 +494,15 @@ let
         type = types.bool;
         default = false;
         description = "Generate a `sign.sh` next to linux artifacts that drives GPG / dpkg-sig / rpmsign.";
+      };
+      auto = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Auto-run `sign.sh` in an impure post-build derivation. Reads
+          `GPG_KEY_ID` / `GNUPGHOME` from the calling shell. Requires
+          `experimental-features = impure-derivations`.
+        '';
       };
       keyId = mkOption {
         type = types.str;
