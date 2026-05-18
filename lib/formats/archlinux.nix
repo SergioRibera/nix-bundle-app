@@ -5,6 +5,7 @@
   utils,
   desktop,
   services,
+  signing,
   drv,
   format,
   meta,
@@ -235,6 +236,11 @@ pkgs.stdenv.mkDerivation {
     ${pkgBlock}
 
     ${aurBlock}
+
+    ${signing.emitSignScript {
+      inherit meta format;
+      artifactGlob = "*.pkg.tar.zst";
+    }}
   '';
 
   passthru = {

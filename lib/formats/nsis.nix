@@ -3,6 +3,7 @@
   lib,
   deps,
   services,
+  signing,
   drv,
   format,
   meta,
@@ -113,6 +114,11 @@ pkgs.stdenv.mkDerivation {
 
         mkdir -p $out
         cp "${outFile}" "$out/${outFile}"
+
+        ${signing.emitSignScript {
+          inherit meta format;
+          artifactGlob = "*-setup.exe";
+        }}
   '';
 
   passthru = {

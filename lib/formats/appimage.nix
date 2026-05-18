@@ -3,6 +3,7 @@
   lib,
   deps,
   desktop,
+  signing,
   drv,
   format,
   meta,
@@ -110,6 +111,11 @@ pkgs.stdenv.mkDerivation {
     mkdir -p $out
     cat ${runtime} payload.squashfs > "$out/${outFile}"
     chmod +x "$out/${outFile}"
+
+    ${signing.emitSignScript {
+      inherit meta format;
+      artifactGlob = "*.AppImage";
+    }}
   '';
 
   passthru = {

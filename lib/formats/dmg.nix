@@ -5,6 +5,7 @@
   utils,
   desktop,
   services,
+  signing,
   drv,
   format,
   meta,
@@ -20,6 +21,7 @@ let
       utils
       desktop
       services
+      signing
       drv
       format
       meta
@@ -71,7 +73,11 @@ pkgs.stdenv.mkDerivation {
         fi
       '';
     in
-    if pkgs.stdenv.isDarwin then darwinBuild else linuxBuild;
+    (if pkgs.stdenv.isDarwin then darwinBuild else linuxBuild)
+    + signing.emitSignScript {
+      inherit meta format;
+      artifactGlob = "*.dmg";
+    };
 
   passthru = {
     info = meta;

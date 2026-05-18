@@ -403,6 +403,117 @@ let
     };
   };
 
+  signingDarwinModule = {
+    options = {
+      enable = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Generate a `sign.sh` next to darwin artifacts that drives `rcodesign`.";
+      };
+      p12File = mkOption {
+        type = types.nullOr (types.either types.path types.str);
+        default = null;
+        description = ''
+          Path to a `.p12` developer-id signing identity. Can be a nix store
+          path (read at script-runtime) or an absolute host path. Override at
+          runtime via `P12_FILE=...` env var.
+        '';
+      };
+      teamId = mkOption {
+        type = types.str;
+        default = "";
+        description = "Apple Team ID (10-char). Embedded as `--team-name`. Override via `TEAM_ID`.";
+      };
+      hardenedRuntime = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Set the hardened-runtime code-signature flag (`--code-signature-flags runtime`).";
+      };
+      entitlements = mkOption {
+        type = types.nullOr (types.either types.path types.str);
+        default = null;
+        description = "Path to an `entitlements.plist` to embed.";
+      };
+    };
+  };
+
+  signingWindowsModule = {
+    options = {
+      enable = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Generate a `sign.sh` next to windows artifacts that drives `osslsigncode`.";
+      };
+      pkcs12File = mkOption {
+        type = types.nullOr (types.either types.path types.str);
+        default = null;
+        description = "Path to a `.pfx`/`.p12` Authenticode signing cert. Override via `PKCS12_FILE`.";
+      };
+      timestampUrl = mkOption {
+        type = types.str;
+        default = "http://timestamp.sectigo.com";
+        description = "RFC 3161 timestamp authority. Override via `TIMESTAMP_URL`.";
+      };
+      description = mkOption {
+        type = types.str;
+        default = "";
+        description = "Embedded `-n` description shown in signature properties.";
+      };
+      url = mkOption {
+        type = types.str;
+        default = "";
+        description = "Embedded `-i` URL shown in signature properties.";
+      };
+    };
+  };
+
+  signingLinuxModule = {
+    options = {
+      enable = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Generate a `sign.sh` next to linux artifacts that drives GPG / dpkg-sig / rpmsign.";
+      };
+      keyId = mkOption {
+        type = types.str;
+        default = "";
+        description = "GPG key fingerprint or short id used as `--local-user`. Override via `GPG_KEY_ID`.";
+      };
+      style = mkOption {
+        type = types.enum [
+          "detached"
+          "embedded"
+        ];
+        default = "detached";
+        description = ''
+          `detached` → emits `<artifact>.sig` next to the bundle (works for any format).
+          `embedded` → uses `dpkg-sig` (deb) or `rpmsign --addsign` (rpm) to embed
+          the signature inside the package. Ignored for appimage/archlinux/tar*.
+        '';
+      };
+    };
+  };
+
+  signingModule = {
+    options = {
+      darwin = mkOption {
+        type = types.submodule signingDarwinModule;
+        default = { };
+        description = "Per-platform signing settings — darwin (`rcodesign`).";
+      };
+      windows = mkOption {
+        type = types.submodule signingWindowsModule;
+        default = { };
+        description = "Per-platform signing settings — windows (`osslsigncode`).";
+      };
+      linux = mkOption {
+        type = types.submodule signingLinuxModule;
+        default = { };
+        description = "Per-platform signing settings — linux (GPG / dpkg-sig / rpmsign).";
+      };
+    };
+  };
+
   archlinuxModule = {
     options = {
       output = mkOption {
@@ -730,6 +841,18 @@ in
       type = types.submodule archlinuxModule;
       default = { };
       description = "Settings for the `archlinux` format (binary pkg vs AUR layout).";
+    };
+
+    signing = mkOption {
+      type = types.submodule signingModule;
+      default = { };
+      description = ''
+        Codesigning hooks. Bundles always build unsigned; when an entry is
+        `enable = true` the corresponding format also drops a turnkey
+        `sign.sh` next to the artifact, ready to run with secrets supplied
+        via env vars (`P12_PASSWORD`, `PKCS12_PASSWORD`, `GPG_KEY_ID`).
+        See README "Codesigning" for the workflow.
+      '';
     };
 
     assertions = mkOption {

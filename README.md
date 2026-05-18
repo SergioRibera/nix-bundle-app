@@ -10,7 +10,7 @@ It does *not* build your program. You hand it a pre-built derivation (e.g. `pkgs
 | darwin  | `app`, `dmg`, `pkg`, `productbuild`, `brew`, `tar.gz`, `zip`                           |
 | windows | `nsis` (`.exe`), `msi`, `zip`                                                          |
 
-Bundles ship unsigned — codesigning is on the [Roadmap](#roadmap).
+Bundles ship unsigned out of the Nix sandbox. Opt-in codesigning hooks drop a turnkey `sign.sh` next to each artifact — see [Codesigning](#codesigning).
 
 ## Quickstart
 
@@ -98,9 +98,42 @@ Set `info.autoDepends = false` to fall back to literal user lists.
 - **`dmg`** on linux: HFS+ hybrid ISO via `xorrisofs -hfsplus` (not a byte-identical UDIF DMG; Finder mounts it fine).
 - **`archlinux`**: by default emits a binary `*.pkg.tar.zst` (install with `pacman -U`) AND an AUR-publishable `aur/` subdir (`PKGBUILD` + `.SRCINFO` + `<name>-bin-<ver>-<arch>.tar.gz`). Toggle via `info.archlinux.output = "pkg" | "aur" | "both"` (default `"both"`). Set `info.downloadUrl` so the generated PKGBUILD's `source=()` + `sha256sums=()` point at your release tarball. Push `aur/` to `aur:<name>-bin.git`.
 
+## Codesigning
+
+Secrets (private keys, p12 passwords) cannot safely live in `/nix/store`, so the actual signing runs **after** `nix build`. Each format checks `info.signing.<os>.enable`; when true, a turnkey `sign.sh` lands next to the artifact. You run it with secrets passed via env vars:
+
+```nix
+info.signing = {
+  darwin = {
+    enable = true;
+    p12File = ./certs/developer-id.p12;
+    teamId  = "ABC1234567";
+    hardenedRuntime = true;
+    entitlements = ./entitlements.plist;
+  };
+  windows = {
+    enable = true;
+    pkcs12File = ./certs/auth.pfx;
+    timestampUrl = "http://timestamp.sectigo.com";
+  };
+  linux = {
+    enable = true;
+    keyId = "0xABCDEF1234567890";
+    style = "embedded";    # `embedded` → dpkg-sig/rpmsign; `detached` → *.sig
+  };
+};
+```
+
+```sh
+nix build .#hello-deb
+P12_PASSWORD="$(cat ~/.secrets/p12.pw)" ./result/sign.sh           # darwin/windows
+GPG_KEY_ID=0xABCDEF1234567890           ./result/sign.sh           # linux
+```
+
+Signers used: `rcodesign` (macOS, cross-platform), `osslsigncode` (Authenticode), `dpkg-sig` / `rpmsign --addsign` (embedded GPG) or `gpg --detach-sign` (detached `.sig`).
+
 ## Caveats
 
-- **No signing.** Anywhere.
 - **`install_name_tool`** only runs on a darwin host. Linux→darwin bundles copy dylibs but skip load-path rewriting.
 - **`mkbom`** (bomutils 0.2 in nixpkgs) crashes under modern glibc FORTIFY checks. Linux-built `.pkg` falls back to an empty Bom — most installers tolerate it. Build on darwin for a compliant Bom.
 - **AppImage runtime** pinned to AppImage's `continuous` release; supply your own via `info.appImageRuntime` for stable releases.
@@ -132,7 +165,6 @@ The committed copies are at [`docs/options.md`](docs/options.md) / [`docs/option
 
 ## Roadmap
 
-- Codesigning hooks (`rcodesign` for macOS, `osslsigncode` for Windows, GPG-signed deb/rpm)
 - Flatpak / Snap output
 
 ## License

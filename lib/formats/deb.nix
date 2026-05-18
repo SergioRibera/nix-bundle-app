@@ -5,6 +5,7 @@
   utils,
   desktop,
   services,
+  signing,
   drv,
   format,
   meta,
@@ -113,6 +114,11 @@ pkgs.stdenv.mkDerivation {
 
     mkdir -p $out
     fakeroot dpkg-deb --build "$stage" "$out/${meta.name}_${meta.version}_${meta.debArch}.deb"
+
+    ${signing.emitSignScript {
+      inherit meta format;
+      artifactGlob = "*.deb";
+    }}
   '';
 
   passthru = {

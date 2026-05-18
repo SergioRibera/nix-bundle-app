@@ -5,6 +5,7 @@
   utils,
   desktop,
   services,
+  signing,
   drv,
   format,
   meta,
@@ -20,6 +21,7 @@ let
       utils
       desktop
       services
+      signing
       drv
       target
       ;

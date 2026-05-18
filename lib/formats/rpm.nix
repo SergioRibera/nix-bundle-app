@@ -5,6 +5,7 @@
   utils,
   desktop,
   services,
+  signing,
   drv,
   format,
   meta,
@@ -149,6 +150,11 @@ pkgs.stdenv.mkDerivation {
     mkdir -p $out
     cp "$topdir/RPMS/${meta.rpmArch}/${meta.name}-${meta.version}-1.${meta.rpmArch}.rpm" \
        "$out/${meta.name}-${meta.version}-1.${meta.rpmArch}.rpm"
+
+    ${signing.emitSignScript {
+      inherit meta format;
+      artifactGlob = "*.rpm";
+    }}
   '';
 
   passthru = {

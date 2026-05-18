@@ -2338,6 +2338,371 @@ null
 
 
 
+## signing
+
+
+
+Codesigning hooks\. Bundles always build unsigned; when an entry is
+` enable = true ` the corresponding format also drops a turnkey
+` sign.sh ` next to the artifact, ready to run with secrets supplied
+via env vars (` P12_PASSWORD `, ` PKCS12_PASSWORD `, ` GPG_KEY_ID `)\.
+See README “Codesigning” for the workflow\.
+
+
+
+*Type:*
+submodule
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+## signing\.darwin
+
+
+
+Per-platform signing settings — darwin (` rcodesign `)\.
+
+
+
+*Type:*
+submodule
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+## signing\.darwin\.enable
+
+
+
+Generate a ` sign.sh ` next to darwin artifacts that drives ` rcodesign `\.
+
+
+
+*Type:*
+boolean
+
+
+
+*Default:*
+
+```nix
+false
+```
+
+
+
+## signing\.darwin\.entitlements
+
+
+
+Path to an ` entitlements.plist ` to embed\.
+
+
+
+*Type:*
+null or absolute path or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## signing\.darwin\.hardenedRuntime
+
+
+
+Set the hardened-runtime code-signature flag (` --code-signature-flags runtime `)\.
+
+
+
+*Type:*
+boolean
+
+
+
+*Default:*
+
+```nix
+true
+```
+
+
+
+## signing\.darwin\.p12File
+
+
+
+Path to a ` .p12 ` developer-id signing identity\. Can be a nix store
+path (read at script-runtime) or an absolute host path\. Override at
+runtime via ` P12_FILE=... ` env var\.
+
+
+
+*Type:*
+null or absolute path or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## signing\.darwin\.teamId
+
+
+
+Apple Team ID (10-char)\. Embedded as ` --team-name `\. Override via ` TEAM_ID `\.
+
+
+
+*Type:*
+string
+
+
+
+*Default:*
+
+```nix
+""
+```
+
+
+
+## signing\.linux
+
+
+
+Per-platform signing settings — linux (GPG / dpkg-sig / rpmsign)\.
+
+
+
+*Type:*
+submodule
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+## signing\.linux\.enable
+
+
+
+Generate a ` sign.sh ` next to linux artifacts that drives GPG / dpkg-sig / rpmsign\.
+
+
+
+*Type:*
+boolean
+
+
+
+*Default:*
+
+```nix
+false
+```
+
+
+
+## signing\.linux\.keyId
+
+
+
+GPG key fingerprint or short id used as ` --local-user `\. Override via ` GPG_KEY_ID `\.
+
+
+
+*Type:*
+string
+
+
+
+*Default:*
+
+```nix
+""
+```
+
+
+
+## signing\.linux\.style
+
+
+
+` detached ` → emits ` <artifact>.sig ` next to the bundle (works for any format)\.
+` embedded ` → uses ` dpkg-sig ` (deb) or ` rpmsign --addsign ` (rpm) to embed
+the signature inside the package\. Ignored for appimage/archlinux/tar\*\.
+
+
+
+*Type:*
+one of “detached”, “embedded”
+
+
+
+*Default:*
+
+```nix
+"detached"
+```
+
+
+
+## signing\.windows
+
+
+
+Per-platform signing settings — windows (` osslsigncode `)\.
+
+
+
+*Type:*
+submodule
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+## signing\.windows\.enable
+
+
+
+Generate a ` sign.sh ` next to windows artifacts that drives ` osslsigncode `\.
+
+
+
+*Type:*
+boolean
+
+
+
+*Default:*
+
+```nix
+false
+```
+
+
+
+## signing\.windows\.description
+
+
+
+Embedded ` -n ` description shown in signature properties\.
+
+
+
+*Type:*
+string
+
+
+
+*Default:*
+
+```nix
+""
+```
+
+
+
+## signing\.windows\.pkcs12File
+
+
+
+Path to a ` .pfx `/` .p12 ` Authenticode signing cert\. Override via ` PKCS12_FILE `\.
+
+
+
+*Type:*
+null or absolute path or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## signing\.windows\.timestampUrl
+
+
+
+RFC 3161 timestamp authority\. Override via ` TIMESTAMP_URL `\.
+
+
+
+*Type:*
+string
+
+
+
+*Default:*
+
+```nix
+"http://timestamp.sectigo.com"
+```
+
+
+
+## signing\.windows\.url
+
+
+
+Embedded ` -i ` URL shown in signature properties\.
+
+
+
+*Type:*
+string
+
+
+
+*Default:*
+
+```nix
+""
+```
+
+
+
 ## summary
 
 

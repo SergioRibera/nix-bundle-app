@@ -8,6 +8,7 @@ let
   services = import ./services.nix { inherit lib utils; };
   infoLib = import ./info.nix { inherit lib utils; };
   deps = import ./deps.nix { inherit pkgs lib utils; };
+  signing = import ./signing.nix { inherit lib; };
 
   formatModules = {
     deb = import ./formats/deb.nix;
@@ -78,6 +79,7 @@ let
         utils
         desktop
         services
+        signing
         drv
         format
         meta
@@ -111,6 +113,7 @@ in
     utils
     desktop
     services
+    signing
     ;
   formats = builtins.attrNames formatModules;
   inherit (infoLib) normalize;

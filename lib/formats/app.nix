@@ -3,6 +3,7 @@
   lib,
   deps,
   services,
+  signing,
   drv,
   format,
   meta,
@@ -84,6 +85,11 @@ pkgs.stdenv.mkDerivation {
                "$appdir/Contents/Resources/LaunchDaemons/${p.filename}"
           '') renderedServices}
         ''}
+
+        ${signing.emitSignScript {
+          inherit meta format;
+          artifactGlob = "*.app";
+        }}
   '';
 
   passthru = {
