@@ -2405,31 +2405,6 @@ false
 
 
 
-## signing\.darwin\.auto
-
-
-
-If true, wrap the bundle in a ` __impure = true ` derivation that
-runs the generated ` sign.sh ` automatically right after the build\.
-The resulting ` nix build ` output is already signed — no manual
-step\. Requires ` experimental-features = impure-derivations ca-derivations ` in your nix config\. Reads ` P12_FILE ` / ` P12_PASSWORD `
-/ ` TEAM_ID ` from the calling shell at build time\. Output is not cached\.
-
-
-
-*Type:*
-boolean
-
-
-
-*Default:*
-
-```nix
-false
-```
-
-
-
 ## signing\.darwin\.entitlements
 
 
@@ -2558,29 +2533,6 @@ false
 
 
 
-## signing\.linux\.auto
-
-
-
-Auto-run ` sign.sh ` in an impure post-build derivation\. Reads
-` GPG_KEY_ID ` / ` GNUPGHOME ` from the calling shell\. Requires
-` experimental-features = impure-derivations `\.
-
-
-
-*Type:*
-boolean
-
-
-
-*Default:*
-
-```nix
-false
-```
-
-
-
 ## signing\.linux\.keyId
 
 
@@ -2651,29 +2603,6 @@ submodule
 
 
 Generate a ` sign.sh ` next to windows artifacts that drives ` osslsigncode `\.
-
-
-
-*Type:*
-boolean
-
-
-
-*Default:*
-
-```nix
-false
-```
-
-
-
-## signing\.windows\.auto
-
-
-
-Auto-run ` sign.sh ` in an impure post-build derivation\. Reads
-` PKCS12_FILE ` / ` PKCS12_PASSWORD ` / ` TIMESTAMP_URL ` from the
-calling shell\. Requires ` experimental-features = impure-derivations `\.
 
 
 

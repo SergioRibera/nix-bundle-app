@@ -27,6 +27,17 @@
           docs = import ./lib/docs.nix { inherit pkgs; };
         };
 
+        # `nix run .#hello-deb-signed -- ./dist` builds + signs in one shot.
+        # The bundle needs `info.signing.<os>.enable = true`; secrets come
+        # from the caller's env vars (P12_PASSWORD / GPG_KEY_ID / …).
+        apps = {
+          hello-deb-signed = bundler.signedApp { bundle = examples.hello-deb; };
+          hello-rpm-signed = bundler.signedApp { bundle = examples.hello-rpm; };
+          hello-pkg-signed = bundler.signedApp { bundle = examples.hello-pkg; };
+          hello-nsis-signed = bundler.signedApp { bundle = examples.hello-nsis; };
+          hello-msi-signed = bundler.signedApp { bundle = examples.hello-msi; };
+        };
+
         checks = tests;
 
         formatter = pkgs.nixfmt-tree;

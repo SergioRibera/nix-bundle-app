@@ -237,113 +237,54 @@ let
       if l.enable then gpgScript l artifactGlob else null
     else
       null;
-  formatPlatform =
-    format:
-    if format == "app" || format == "dmg" || format == "pkg" || format == "productbuild" then
-      "darwin"
-    else if format == "nsis" || format == "exe" || format == "msi" then
-      "windows"
-    else if format == "deb" || format == "rpm" || format == "archlinux" || format == "appimage" then
-      "linux"
-    else
-      null;
-
-  # Tools the auto-sign wrapper needs on PATH for each style of signer.
-  signerTools =
+  # Builds a flake `app` that:
+  #   1. Stages a fresh copy of the unsigned bundle into a temp dir (or $1)
+  #   2. Runs `sign.sh` (which reads secrets from the caller's env vars)
+  #   3. Prints the path to the signed bundle on stdout
+  # Caller wires it into their flake as `apps.<name> = bundler.signedApp { bundle; }`
+  # and runs `GPG_KEY_ID=… nix run .#<name> -- ./dist` to produce a signed bundle
+  # without touching `result/sign.sh` manually. The underlying `bundle` derivation
+  # stays pure + cacheable.
+  signedApp =
     {
-      platform,
-      style,
-    }:
-    if platform == "darwin" then
-      [ pkgs.rcodesign ]
-    else if platform == "windows" then
-      [ pkgs.osslsigncode ]
-    else if platform == "linux" then
-      [ pkgs.gnupg ]
-      ++ (
-        if style == "embedded" then
-          [
-            pkgs.dpkg-sig
-            pkgs.rpm
-          ]
-        else
-          [ ]
-      )
-    else
-      [ ];
-
-  # Wrap a bundle derivation in an impure derivation that runs sign.sh
-  # right after the build, producing a pre-signed output. Returns the bundle
-  # unchanged if `auto` is not enabled for the relevant platform.
-  wrapAutoSign =
-    {
-      meta,
-      format,
       bundle,
+      name ? "${baseNameOf bundle.name}-sign",
     }:
     let
-      platform = formatPlatform format;
-      enabled =
-        platform != null
-        && meta.signing.${platform}.enable or false
-        && meta.signing.${platform}.auto or false;
-      style = meta.signing.linux.style or "detached";
-      tools = signerTools { inherit platform style; };
-    in
-    if !enabled then
-      bundle
-    else
-      pkgs.stdenv.mkDerivation {
-        name = "${bundle.name}-signed";
-        dontUnpack = true;
-
-        # `__impure = true` requires `experimental-features =
-        # impure-derivations ca-derivations` in nix config. Output is not
-        # cached — every build re-runs the signer.
-        __impure = true;
-
-        # Pass secrets / cert paths through from the calling shell.
-        impureEnvVars = [
-          "P12_FILE"
-          "P12_PASSWORD"
-          "TEAM_ID"
-          "PKCS12_FILE"
-          "PKCS12_PASSWORD"
-          "TIMESTAMP_URL"
-          "GPG_KEY_ID"
-          "GNUPGHOME"
-          "GPG_TTY"
-          "HOME"
+      script = pkgs.writeShellApplication {
+        inherit name;
+        runtimeInputs = with pkgs; [
+          coreutils
+          bash
         ];
-
-        nativeBuildInputs = tools ++ [
-          pkgs.coreutils
-          pkgs.bash
-        ];
-
-        buildCommand = ''
-          mkdir -p $out
-          cp -r --no-preserve=mode,ownership ${bundle}/. $out/
-          chmod -R u+w $out
-          if [ -x "$out/sign.sh" ]; then
-            ( cd $out && bash ./sign.sh )
-            rm -f $out/sign.sh
+        text = ''
+          set -euo pipefail
+          bundle=${bundle}
+          if [ "$#" -ge 1 ]; then
+            target=$1
+            mkdir -p "$target"
           else
-            echo "warning: auto-sign enabled but no sign.sh produced — bundle left unsigned." >&2
+            target=$(mktemp -d -t "${name}-XXXX")
+          fi
+          cp -r --no-preserve=mode,ownership "$bundle"/. "$target"/
+          chmod -R u+w "$target"
+          if [ -x "$target/sign.sh" ]; then
+            ( cd "$target" && bash ./sign.sh )
+            rm -f "$target/sign.sh"
+            echo
+            echo "Signed bundle ready at: $target"
+          else
+            echo "warning: $bundle has no sign.sh (info.signing.<os>.enable not set)" >&2
+            echo "Bundle copied unmodified to: $target"
           fi
         '';
-
-        passthru = (bundle.passthru or { }) // {
-          unsignedBundle = bundle;
-          signedAutomatically = true;
-        };
       };
+    in
+    {
+      type = "app";
+      program = "${script}/bin/${name}";
+    };
 in
 {
-  inherit
-    pickScript
-    emitSignScript
-    wrapAutoSign
-    formatPlatform
-    ;
+  inherit pickScript emitSignScript signedApp;
 }

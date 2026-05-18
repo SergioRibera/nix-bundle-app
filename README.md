@@ -130,25 +130,20 @@ P12_PASSWORD="$(cat ~/.secrets/p12.pw)" ./result/sign.sh           # darwin/wind
 GPG_KEY_ID=0xABCDEF1234567890           ./result/sign.sh           # linux
 ```
 
-### Auto-sign (no manual step)
+### One-shot build + sign (no manual step)
 
-Set `info.signing.<os>.auto = true` to wrap the bundle in a `__impure = true` derivation that runs `sign.sh` immediately after the build. `nix build .#hello-deb` then produces an already-signed artifact — no `./result/sign.sh` invocation needed.
+Wire `bundler.signedApp { bundle = …; }` into your flake's `apps`. `nix run .#<name>` builds the (pure, cacheable) bundle, then signs it in your shell where env vars are available:
 
 ```nix
-info.signing.linux = {
-  enable = true; auto = true; keyId = "0xABCDEF1234567890";
-};
+apps.hello-deb-signed = bundler.signedApp { bundle = self.packages.${system}.hello-deb; };
 ```
 
 ```sh
-GPG_KEY_ID=0xABCDEF1234567890 nix build .#hello-deb     # one shot, signed
+GPG_KEY_ID=0xABCDEF1234567890 nix run .#hello-deb-signed -- ./dist
+# → ./dist/<name>.deb (signed) — sign.sh is removed from the output
 ```
 
-Caveats:
-- Requires `experimental-features = impure-derivations ca-derivations` in your nix config.
-- Output is **not cached** — every build re-runs the signer.
-- Secrets are read from env vars at build time (not stored in `/nix/store`).
-- Unsigned bundle is still accessible via `result.passthru.unsignedBundle`.
+Pass `--` followed by a target dir, or omit it for a fresh `mktemp -d`. The underlying bundle derivation stays cached; only the sign step is impure (your shell).
 
 Signers used: `rcodesign` (macOS, cross-platform), `osslsigncode` (Authenticode), `dpkg-sig` / `rpmsign --addsign` (embedded GPG) or `gpg --detach-sign` (detached `.sig`).
 

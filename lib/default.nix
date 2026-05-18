@@ -70,25 +70,21 @@ let
           requiredOS == "any" || requiredOS == t.os
         ) "nix-bundle-app: format '${format}' requires os='${requiredOS}', got os='${t.os}'.";
         infoLib.normalize info drv t format;
-      built = mod {
-        inherit
-          pkgs
-          lib
-          deps
-          utils
-          desktop
-          services
-          signing
-          drv
-          format
-          meta
-          ;
-        target = t;
-      };
     in
-    signing.wrapAutoSign {
-      inherit meta format;
-      bundle = built;
+    mod {
+      inherit
+        pkgs
+        lib
+        deps
+        utils
+        desktop
+        services
+        signing
+        drv
+        format
+        meta
+        ;
+      target = t;
     };
 
   bundleAll =
@@ -119,6 +115,7 @@ in
     services
     signing
     ;
+  inherit (signing) signedApp;
   formats = builtins.attrNames formatModules;
   inherit (infoLib) normalize;
 }
