@@ -175,7 +175,7 @@ pkgs.stdenv.mkDerivation {
 
   passthru = {
     info = meta;
-    inherit target format;
+    inherit target format outFile;
     componentPkg = inner;
   };
 }

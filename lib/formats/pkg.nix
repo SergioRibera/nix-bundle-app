@@ -175,6 +175,11 @@ pkgs.stdenv.mkDerivation {
 
   passthru = {
     info = meta;
-    inherit target format appBundle;
+    inherit
+      target
+      format
+      outFile
+      appBundle
+      ;
   };
 }

@@ -132,5 +132,6 @@ pkgs.stdenv.mkDerivation {
   passthru = {
     info = meta;
     inherit target format tarball;
+    outFile = "${meta.name}.rb";
   };
 }

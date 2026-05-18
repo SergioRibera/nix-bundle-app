@@ -160,5 +160,6 @@ pkgs.stdenv.mkDerivation {
   passthru = {
     info = meta;
     inherit target format;
+    outFile = "${meta.name}-${meta.version}-1.${meta.rpmArch}.rpm";
   };
 }

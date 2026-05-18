@@ -95,6 +95,7 @@ pkgs.stdenv.mkDerivation {
   passthru = {
     info = meta;
     inherit target format;
+    outFile = appName;
     launchdPlists = renderedServices;
   };
 }

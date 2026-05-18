@@ -345,6 +345,32 @@ in
     };
   };
 
+  hello-release = bundler.release {
+    info = commonInfo;
+    baseUrl = "https://github.com/example/hello/releases/download/v\${VERSION}";
+    matrix = {
+      "x86_64-linux" = {
+        drv = helloLinux;
+        formats = [
+          "tar.gz"
+          "deb"
+          "rpm"
+        ];
+      };
+      "x86_64-darwin" = {
+        drv = helloLinux;
+        formats = [ "tar.gz" ];
+      };
+      "x86_64-windows" = {
+        drv = helloWindows;
+        formats = [
+          "zip"
+          "msi"
+        ];
+      };
+    };
+  };
+
   hello-brew-linux = bundler.bundle {
     drv = helloLinux;
     format = "brew";

@@ -124,5 +124,6 @@ pkgs.stdenv.mkDerivation {
   passthru = {
     info = meta;
     inherit target format;
+    outFile = "${meta.name}_${meta.version}_${meta.debArch}.deb";
   };
 }

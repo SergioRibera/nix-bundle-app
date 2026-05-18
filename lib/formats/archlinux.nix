@@ -247,5 +247,7 @@ pkgs.stdenv.mkDerivation {
     info = meta;
     inherit target format;
     archlinuxMode = mode;
+    outFile =
+      if mode == "aur" then "PKGBUILD" else "${meta.name}-${meta.version}-1-${pkgArch}.pkg.tar.zst";
   };
 }

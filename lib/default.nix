@@ -9,6 +9,7 @@ let
   infoLib = import ./info.nix { inherit lib utils; };
   deps = import ./deps.nix { inherit pkgs lib utils; };
   signing = import ./signing.nix { inherit pkgs lib; };
+  releaseLib = import ./release.nix { inherit pkgs lib; };
 
   formatModules = {
     deb = import ./formats/deb.nix;
@@ -120,6 +121,8 @@ in
     signing
     ;
   inherit (signing) signedApp;
+  release = releaseLib.release bundle;
+  installScripts = releaseLib.installScripts bundle;
   formats = builtins.attrNames formatModules;
   inherit (infoLib) normalize;
 }

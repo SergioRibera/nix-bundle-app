@@ -121,5 +121,6 @@ pkgs.stdenv.mkDerivation {
   passthru = {
     info = meta;
     inherit target format runtime;
+    inherit outFile;
   };
 }
