@@ -403,6 +403,55 @@ let
     };
   };
 
+  productbuildModule = {
+    options = {
+      title = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Installer window title. Defaults to `info.name` when null.";
+      };
+      organization = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Reverse-DNS organization id (top half of `bundleId`).";
+      };
+      welcome = mkOption {
+        type = types.nullOr (types.either types.path types.str);
+        default = null;
+        description = "Path to a welcome screen file (rtf/rtfd/html/txt).";
+        example = literalExpression "./Resources/welcome.html";
+      };
+      license = mkOption {
+        type = types.nullOr (types.either types.path types.str);
+        default = null;
+        description = "Path to a license file shown on the License screen.";
+      };
+      readme = mkOption {
+        type = types.nullOr (types.either types.path types.str);
+        default = null;
+        description = "Path to a readme/release-notes file shown on the Readme screen.";
+      };
+      conclusion = mkOption {
+        type = types.nullOr (types.either types.path types.str);
+        default = null;
+        description = "Path to a conclusion screen file shown after install completes.";
+      };
+      background = mkOption {
+        type = types.nullOr (types.either types.path types.str);
+        default = null;
+        description = "Optional installer background image (png/tiff/jpg).";
+      };
+      allowCustomize = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          If true the installer offers the Customize button. Useful when the
+          distribution contains more than one component.
+        '';
+      };
+    };
+  };
+
   dependsModule = {
     options = {
       deb = mkOption {
@@ -647,6 +696,15 @@ in
       type = types.submodule dependsModule;
       default = { };
       description = "Per-format runtime dependencies surfaced in manifests.";
+    };
+
+    productbuild = mkOption {
+      type = types.submodule productbuildModule;
+      default = { };
+      description = ''
+        Settings for the macOS `productbuild` distribution format. Drives the
+        welcome / license / readme / conclusion screens and the installer chrome.
+      '';
     };
 
     assertions = mkOption {

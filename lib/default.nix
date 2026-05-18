@@ -20,6 +20,7 @@ let
     app = import ./formats/app.nix;
     dmg = import ./formats/dmg.nix;
     pkg = import ./formats/pkg.nix;
+    productbuild = import ./formats/productbuild.nix;
     brew = import ./formats/brew.nix;
     nsis = import ./formats/nsis.nix;
     exe = import ./formats/nsis.nix;
@@ -35,6 +36,7 @@ let
     app = "darwin";
     dmg = "darwin";
     pkg = "darwin";
+    productbuild = "darwin";
     # Homebrew is supported on macOS AND linuxbrew. Allow any host.
     brew = "any";
     nsis = "windows";

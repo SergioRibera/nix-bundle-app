@@ -137,6 +137,23 @@ in
     expect = "hello-*-x86_64.pkg";
   };
 
+  bundle-productbuild = check {
+    name = "productbuild";
+    format = "productbuild";
+    inherit drv;
+    info = info // {
+      productbuild = {
+        title = "Hello Installer";
+        license = pkgs.writeText "license.txt" "MIT.";
+      };
+    };
+    target = {
+      arch = "x86_64";
+      os = "darwin";
+    };
+    expect = "hello-*-x86_64-install.pkg";
+  };
+
   bundle-msi = check {
     name = "msi";
     format = "msi";

@@ -178,6 +178,24 @@ in
     };
   };
 
+  hello-productbuild = bundler.bundle {
+    drv = helloLinux;
+    format = "productbuild";
+    info = commonInfo // {
+      productbuild = {
+        title = "Hello Installer";
+        organization = "com.example";
+        welcome = pkgs.writeText "welcome.html" "<html><body><h1>Hello</h1></body></html>";
+        license = pkgs.writeText "license.txt" "MIT.";
+        conclusion = pkgs.writeText "conclusion.html" "<html><body>Installed.</body></html>";
+      };
+    };
+    target = {
+      arch = "x86_64";
+      os = "darwin";
+    };
+  };
+
   hello-msi = bundler.bundle {
     drv = helloWindows;
     format = "msi";
