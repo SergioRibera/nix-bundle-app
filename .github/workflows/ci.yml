@@ -31,7 +31,6 @@ jobs:
 
       - name: nixfmt --check
         run: |
-          # Fail if any tracked .nix file is unformatted.
           mapfile -t files < <(git ls-files '*.nix')
           if [ "${#files[@]}" -eq 0 ]; then exit 0; fi
           nix run nixpkgs#nixfmt-rfc-style -- --check "${files[@]}"
@@ -42,8 +41,8 @@ jobs:
       - name: nix flake check
         run: nix flake check -L --keep-going
 
-  smoke:
-    name: Smoke-build representative bundles
+  bundles-linux:
+    name: Build + upload linux bundles
     runs-on: ubuntu-latest
     timeout-minutes: 60
     needs: check
@@ -61,18 +60,104 @@ jobs:
       - name: Cache /nix/store
         uses: DeterminateSystems/magic-nix-cache-action@main
 
-      - name: Build all-linux + all-windows + all-darwin
+      - name: Build linux bundles
+        run: nix build .#hello-all-linux -L -o result-linux
+
+      - name: Stage artifacts
         run: |
           set -euxo pipefail
-          nix build .#hello-all-linux   -L
-          nix build .#hello-all-windows -L
-          nix build .#hello-all-darwin  -L
-          nix build .#docs              -L
-
-      - name: List artifacts
-        run: |
-          for d in result*; do
+          mkdir -p artifacts/linux
+          # linkFarm result-linux has one symlink per format
+          for d in result-linux/*; do
             [ -e "$d" ] || continue
-            echo "== $d =="
-            ls -R "$d"
+            cp -L -r "$d"/* artifacts/linux/ 2>/dev/null || true
           done
+          ls -lR artifacts/linux
+
+      - name: Upload linux bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundles-linux
+          path: artifacts/linux/**
+          if-no-files-found: error
+          retention-days: 14
+
+  bundles-windows:
+    name: Build + upload windows bundles
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Cache /nix/store
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Build windows bundles (cross-compiled from linux)
+        run: nix build .#hello-all-windows -L -o result-windows
+
+      - name: Stage artifacts
+        run: |
+          set -euxo pipefail
+          mkdir -p artifacts/windows
+          for d in result-windows/*; do
+            [ -e "$d" ] || continue
+            cp -L -r "$d"/* artifacts/windows/ 2>/dev/null || true
+          done
+          ls -lR artifacts/windows
+
+      - name: Upload windows bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundles-windows
+          path: artifacts/windows/**
+          if-no-files-found: error
+          retention-days: 14
+
+  bundles-darwin:
+    name: Build + upload darwin bundles
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Cache /nix/store
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Build darwin bundles (cross-staged from linux)
+        run: nix build .#hello-all-darwin -L -o result-darwin
+
+      - name: Stage artifacts
+        run: |
+          set -euxo pipefail
+          mkdir -p artifacts/darwin
+          for d in result-darwin/*; do
+            [ -e "$d" ] || continue
+            cp -L -r "$d"/* artifacts/darwin/ 2>/dev/null || true
+          done
+          ls -lR artifacts/darwin
+
+      - name: Upload darwin bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundles-darwin
+          path: artifacts/darwin/**
+          if-no-files-found: error
+          retention-days: 14
