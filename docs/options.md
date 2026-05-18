@@ -1053,6 +1053,161 @@ string
 
 
 
+## flatpak
+
+
+
+Settings for the ` flatpak ` format (manifest + source layout)\.
+
+
+
+*Type:*
+submodule
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+## flatpak\.command
+
+
+
+Name of the binary ` flatpak run <appid> ` invokes\. Defaults to ` info.name `\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## flatpak\.extraModules
+
+
+
+Extra ` modules ` entries appended to the generated manifest\. Each
+should be an attrset matching the flatpak-builder schema (raw YAML
+struct: ` { name = ...; buildsystem = ...; sources = ...; } `)\.
+
+
+
+*Type:*
+list of (attribute set)
+
+
+
+*Default:*
+
+```nix
+[ ]
+```
+
+
+
+## flatpak\.finishArgs
+
+
+
+Sandbox permission flags passed to ` flatpak-builder ` via the
+manifest’s ` finish-args `\. Tune for GUI vs CLI vs networked apps\.
+
+
+
+*Type:*
+list of string
+
+
+
+*Default:*
+
+```nix
+[
+  "--share=ipc"
+  "--socket=wayland"
+  "--socket=fallback-x11"
+  "--device=dri"
+]
+```
+
+
+
+## flatpak\.runtime
+
+
+
+Flatpak runtime to target (e\.g\. ` org.freedesktop.Platform `, ` org.gnome.Platform `)\.
+
+
+
+*Type:*
+string
+
+
+
+*Default:*
+
+```nix
+"org.freedesktop.Platform"
+```
+
+
+
+## flatpak\.runtimeVersion
+
+
+
+Runtime version string\.
+
+
+
+*Type:*
+string
+
+
+
+*Default:*
+
+```nix
+"23.08"
+```
+
+
+
+## flatpak\.sdk
+
+
+
+SDK paired with ` runtime ` for the build step\.
+
+
+
+*Type:*
+string
+
+
+
+*Default:*
+
+```nix
+"org.freedesktop.Sdk"
+```
+
+
+
 ## homepage
 
 
@@ -2088,8 +2243,6 @@ attribute set of unspecified value
 
 ## services\.\*\.systemd\.wantedBy
 
-
-
 Targets that pull this unit in via ` WantedBy= `\.
 
 
@@ -2236,6 +2389,8 @@ list of string
 
 
 ## services\.\*\.windows\.displayName
+
+
 
 Friendly display name (services\.msc)\.
 
@@ -2699,6 +2854,135 @@ string
 
 ```nix
 ""
+```
+
+
+
+## snap
+
+
+
+Settings for the ` snap ` format (` snapcraft.yaml ` + source layout)\.
+
+
+
+*Type:*
+submodule
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+## snap\.base
+
+
+
+Snap base\. ` core22 ` ↔ Ubuntu 22\.04 LTS\.
+
+
+
+*Type:*
+string
+
+
+
+*Default:*
+
+```nix
+"core22"
+```
+
+
+
+## snap\.confinement
+
+
+
+Sandbox confinement level\. ` classic ` requires Snap Store review\.
+
+
+
+*Type:*
+one of “strict”, “classic”, “devmode”
+
+
+
+*Default:*
+
+```nix
+"strict"
+```
+
+
+
+## snap\.grade
+
+
+
+Snap grade (devel snaps may not be promoted past edge/beta)\.
+
+
+
+*Type:*
+one of “stable”, “devel”
+
+
+
+*Default:*
+
+```nix
+"stable"
+```
+
+
+
+## snap\.plugs
+
+
+
+Interfaces (plugs) the app consumes\.
+
+
+
+*Type:*
+list of string
+
+
+
+*Default:*
+
+```nix
+[
+  "home"
+  "network"
+]
+```
+
+
+
+## snap\.summary
+
+
+
+Snap summary line\. Defaults to ` info.summary `\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
 ```
 
 

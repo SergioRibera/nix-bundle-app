@@ -185,6 +185,17 @@ in
     info = commonInfo;
   };
 
+  hello-flatpak = bundler.bundle {
+    drv = helloLinux;
+    format = "flatpak";
+    info = commonInfo // {
+      flatpak.finishArgs = [
+        "--share=ipc"
+        "--socket=fallback-x11"
+      ];
+    };
+  };
+
   hello-pkg = bundler.bundle {
     drv = helloLinux;
     format = "pkg";

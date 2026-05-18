@@ -115,4 +115,23 @@ in
       test -x "$tmp/${rustName}-${rustVersion}/bin/${rustName}"
     '';
   };
+
+  rust-flatpak = e2e {
+    name = "rust-flatpak";
+    format = "flatpak";
+    drv = rustLinux;
+    info = rustInfo;
+    expect = "${rustName}-${rustVersion}.tar.gz";
+    assertScript = ''
+      bundleDir=$(dirname "$artifact")
+      test -f "$bundleDir/com.example.${rustName}.yaml"
+      test -x "$bundleDir/build.sh"
+      grep -q "app-id: com.example.${rustName}" "$bundleDir/com.example.${rustName}.yaml"
+      grep -q "runtime: org.freedesktop.Platform" "$bundleDir/com.example.${rustName}.yaml"
+
+      tmp=$(mktemp -d)
+      tar -xzf "$artifact" -C "$tmp"
+      test -x "$tmp/opt/${rustName}/bin/${rustName}"
+    '';
+  };
 }

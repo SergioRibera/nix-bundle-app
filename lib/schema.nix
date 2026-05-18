@@ -514,6 +514,93 @@ let
     };
   };
 
+  flatpakModule = {
+    options = {
+      runtime = mkOption {
+        type = types.str;
+        default = "org.freedesktop.Platform";
+        description = "Flatpak runtime to target (e.g. `org.freedesktop.Platform`, `org.gnome.Platform`).";
+      };
+      runtimeVersion = mkOption {
+        type = types.str;
+        default = "23.08";
+        description = "Runtime version string.";
+      };
+      sdk = mkOption {
+        type = types.str;
+        default = "org.freedesktop.Sdk";
+        description = "SDK paired with `runtime` for the build step.";
+      };
+      command = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Name of the binary `flatpak run <appid>` invokes. Defaults to `info.name`.";
+      };
+      finishArgs = mkOption {
+        type = types.listOf types.str;
+        default = [
+          "--share=ipc"
+          "--socket=wayland"
+          "--socket=fallback-x11"
+          "--device=dri"
+        ];
+        description = ''
+          Sandbox permission flags passed to `flatpak-builder` via the
+          manifest's `finish-args`. Tune for GUI vs CLI vs networked apps.
+        '';
+      };
+      extraModules = mkOption {
+        type = types.listOf types.attrs;
+        default = [ ];
+        description = ''
+          Extra `modules` entries appended to the generated manifest. Each
+          should be an attrset matching the flatpak-builder schema (raw YAML
+          struct: `{ name = ...; buildsystem = ...; sources = ...; }`).
+        '';
+      };
+    };
+  };
+
+  snapModule = {
+    options = {
+      base = mkOption {
+        type = types.str;
+        default = "core22";
+        description = "Snap base. `core22` ↔ Ubuntu 22.04 LTS.";
+      };
+      grade = mkOption {
+        type = types.enum [
+          "stable"
+          "devel"
+        ];
+        default = "stable";
+        description = "Snap grade (devel snaps may not be promoted past edge/beta).";
+      };
+      confinement = mkOption {
+        type = types.enum [
+          "strict"
+          "classic"
+          "devmode"
+        ];
+        default = "strict";
+        description = "Sandbox confinement level. `classic` requires Snap Store review.";
+      };
+      plugs = mkOption {
+        type = types.listOf types.str;
+        default = [
+          "home"
+          "network"
+        ];
+        description = "Interfaces (plugs) the app consumes.";
+      };
+      summary = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Snap summary line. Defaults to `info.summary`.";
+      };
+    };
+  };
+
   archlinuxModule = {
     options = {
       output = mkOption {
@@ -841,6 +928,18 @@ in
       type = types.submodule archlinuxModule;
       default = { };
       description = "Settings for the `archlinux` format (binary pkg vs AUR layout).";
+    };
+
+    flatpak = mkOption {
+      type = types.submodule flatpakModule;
+      default = { };
+      description = "Settings for the `flatpak` format (manifest + source layout).";
+    };
+
+    snap = mkOption {
+      type = types.submodule snapModule;
+      default = { };
+      description = "Settings for the `snap` format (`snapcraft.yaml` + source layout).";
     };
 
     signing = mkOption {
