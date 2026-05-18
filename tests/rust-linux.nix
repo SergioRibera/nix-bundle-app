@@ -51,7 +51,9 @@ in
     name = "rust-archlinux";
     format = "archlinux";
     drv = rustLinux;
-    info = rustInfo;
+    info = rustInfo // {
+      downloadUrl = "https://example.com/releases/${rustName}-bin-${rustVersion}-x86_64.tar.gz";
+    };
     expect = "${rustName}-${rustVersion}-1-x86_64.pkg.tar.zst";
     probeInputs = [ pkgs.libarchive ];
     assertScript = ''
@@ -59,6 +61,15 @@ in
       bsdtar --zstd -xf "$artifact" -C "$tmp"
       test -x "$tmp/opt/${rustName}/bin/${rustName}"
       grep -q "pkgname = ${rustName}" "$tmp/.PKGINFO"
+
+      # AUR layout next to the binary pkg.
+      aurDir="$(dirname "$artifact")/aur"
+      test -d "$aurDir"
+      test -f "$aurDir/PKGBUILD"
+      test -f "$aurDir/.SRCINFO"
+      test -f "$aurDir/${rustName}-bin-${rustVersion}-x86_64.tar.gz"
+      grep -q "pkgname=${rustName}-bin" "$aurDir/PKGBUILD"
+      grep -q "pkgbase = ${rustName}-bin" "$aurDir/.SRCINFO"
     '';
   };
 

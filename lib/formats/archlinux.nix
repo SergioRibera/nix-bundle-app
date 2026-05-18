@@ -26,6 +26,11 @@ let
   reqs = meta.depends.archlinux or [ ];
   optDeps = meta.depends.archlinuxOptional or [ ];
 
+  aurPkgname = "${meta.name}-bin";
+  aurTarName = "${aurPkgname}-${meta.version}-${pkgArch}.tar.gz";
+  downloadUrl =
+    if meta.downloadUrl != "" then meta.downloadUrl else "https://example.com/releases/${aurTarName}";
+
   installScript = lib.optionalString (common.hasServices meta) ''
     post_install() {
       ${common.postinstSnippet meta}
@@ -40,6 +45,9 @@ let
       ${common.postrmSnippet meta}
     }
   '';
+
+  depsArr = lib.concatMapStringsSep " " (d: "'" + d + "'") reqs;
+  optDepsArr = lib.concatMapStringsSep " " (d: "'" + d + "'") optDeps;
 in
 pkgs.stdenv.mkDerivation {
   name = "${meta.name}-${meta.version}-1-${pkgArch}.pkg.tar.zst";
@@ -48,6 +56,7 @@ pkgs.stdenv.mkDerivation {
     libarchive
     zstd
     gzip
+    gnutar
     patchelf
     file
     gnugrep
@@ -133,29 +142,80 @@ pkgs.stdenv.mkDerivation {
         | ${pkgs.zstd}/bin/zstd -19 -T0 -o "$out_pkg"
     )
 
-    cat > "$out/PKGBUILD" <<EOF
+    # AUR-publishable layout: a source tarball (bin-style payload) plus a
+    # PKGBUILD that downloads it from `info.downloadUrl` + a generated
+    # `.SRCINFO`. Push the trio to `aur:<pkgname>-bin.git`.
+    aurDir=$out/aur
+    mkdir -p "$aurDir"
+
+    aurStage=$PWD/aur-stage
+    mkdir -p "$aurStage"
+    ( cd "$stage" && ${pkgs.coreutils}/bin/cp -a --no-preserve=ownership . "$aurStage/" )
+    rm -f "$aurStage/.PKGINFO" "$aurStage/.MTREE" "$aurStage/.INSTALL"
+
+    aurTar="$aurDir/${aurTarName}"
+    ( cd "$aurStage" && ${pkgs.gnutar}/bin/tar --owner=0 --group=0 --sort=name \
+        -czf "$aurTar" . )
+
+    aurSha=$(${pkgs.coreutils}/bin/sha256sum "$aurTar" | ${pkgs.coreutils}/bin/cut -d' ' -f1)
+
+    cat > "$aurDir/PKGBUILD" <<EOF
     # Maintainer: ${meta.maintainer}
-    pkgname=${meta.name}
+    pkgname=${aurPkgname}
+    _pkgname=${meta.name}
     pkgver=${meta.version}
     pkgrel=1
     pkgdesc='${meta.summary}'
     arch=('${pkgArch}')
     url='${meta.homepage}'
     license=('${meta.license}')
-    depends=(${lib.concatMapStringsSep " " (d: "'" + d + "'") reqs})
-    ${lib.optionalString (optDeps != [ ])
-      "optdepends=(${lib.concatMapStringsSep " " (d: "'" + d + "'") optDeps})"
-    }
-    source=("${meta.name}-${meta.version}.tar.gz")
-    sha256sums=('SKIP')
+    depends=(${depsArr})
+    ${lib.optionalString (optDeps != [ ]) "optdepends=(${optDepsArr})"}
+    provides=("\''${_pkgname}=\''${pkgver}")
+    conflicts=("\''${_pkgname}")
+    source=("${downloadUrl}")
+    sha256sums=("$aurSha")
+    ${lib.optionalString (common.hasServices meta) "install=${aurPkgname}.install"}
 
     package() {
-      cp -r "\$srcdir/opt"     "\$pkgdir/" 2>/dev/null || true
-      cp -r "\$srcdir/usr"     "\$pkgdir/" 2>/dev/null || true
-      cp -r "\$srcdir/lib"     "\$pkgdir/" 2>/dev/null || true
+      cp -a "\$srcdir/opt"  "\$pkgdir/"  2>/dev/null || true
+      cp -a "\$srcdir/usr"  "\$pkgdir/"  2>/dev/null || true
+      cp -a "\$srcdir/lib"  "\$pkgdir/"  2>/dev/null || true
     }
     EOF
-    ${pkgs.gnused}/bin/sed -i 's/^    //' "$out/PKGBUILD"
+    ${pkgs.gnused}/bin/sed -i 's/^    //' "$aurDir/PKGBUILD"
+
+    ${lib.optionalString (common.hasServices meta) ''
+      cp ${pkgs.writeText "${aurPkgname}.install" installScript} "$aurDir/${aurPkgname}.install"
+    ''}
+
+    {
+      echo "pkgbase = ${aurPkgname}"
+      echo "	pkgdesc = ${meta.summary}"
+      echo "	pkgver = ${meta.version}"
+      echo "	pkgrel = 1"
+      echo "	url = ${meta.homepage}"
+      echo "	arch = ${pkgArch}"
+      echo "	license = ${meta.license}"
+      ${lib.concatMapStrings (d: ''
+        echo "	depends = ${d}"
+      '') reqs}
+      ${lib.concatMapStrings (d: ''
+        echo "	optdepends = ${d}"
+      '') optDeps}
+      echo "	provides = ${meta.name}=${meta.version}"
+      echo "	conflicts = ${meta.name}"
+      echo "	source = ${downloadUrl}"
+      echo "	sha256sums = $aurSha"
+      ${lib.optionalString (common.hasServices meta) ''
+        echo "	install = ${aurPkgname}.install"
+      ''}
+      echo ""
+      echo "pkgname = ${aurPkgname}"
+    } > "$aurDir/.SRCINFO"
+
+    # Drop the old local-source PKGBUILD; users should consume aur/ instead.
+    rm -f "$out/PKGBUILD"
   '';
 
   passthru = {
