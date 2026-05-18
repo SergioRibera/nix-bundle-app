@@ -64,12 +64,17 @@ pkgs.stdenv.mkDerivation {
     # in read-only. Make everything writable so cleanup succeeds.
     chmod -R u+w "$buildroot"
 
-    ${lib.optionalString meta.autoDepends (deps.discoverLinuxDepsSnippet {
-      kind = "rpm";
-      scanDirs = [ "$buildroot/opt/${meta.name}/bin" "$buildroot/opt/${meta.name}/lib" ];
-      userDeps = reqs;
-      outFile = "rpm-requires.csv";
-    })}
+    ${lib.optionalString meta.autoDepends (
+      deps.discoverLinuxDepsSnippet {
+        kind = "rpm";
+        scanDirs = [
+          "$buildroot/opt/${meta.name}/bin"
+          "$buildroot/opt/${meta.name}/lib"
+        ];
+        userDeps = reqs;
+        outFile = "rpm-requires.csv";
+      }
+    )}
 
     requires_line=""
     ${
@@ -80,9 +85,7 @@ pkgs.stdenv.mkDerivation {
           fi
         ''
       else
-        lib.optionalString (
-          reqs != [ ]
-        ) ''requires_line="Requires: ${lib.concatStringsSep ", " reqs}"''
+        lib.optionalString (reqs != [ ]) ''requires_line="Requires: ${lib.concatStringsSep ", " reqs}"''
     }
 
     {
@@ -96,8 +99,7 @@ pkgs.stdenv.mkDerivation {
       echo "BuildArch: ${meta.rpmArch}"
       echo "AutoReqProv: no"
       [ -n "$requires_line" ] && echo "$requires_line"
-      ${lib.optionalString (recs != [ ])
-        ''echo "Recommends: ${lib.concatStringsSep ", " recs}"''}
+      ${lib.optionalString (recs != [ ]) ''echo "Recommends: ${lib.concatStringsSep ", " recs}"''}
       echo
       echo "%description"
       echo "${meta.longDescription}"
@@ -105,8 +107,7 @@ pkgs.stdenv.mkDerivation {
       echo "%files"
       echo "%attr(0755, root, root) /opt/${meta.name}"
       echo "/usr/bin/*"
-      ${lib.optionalString (common.hasServices meta)
-        ''echo "%attr(0644, root, root) /lib/systemd/system/*"''}
+      ${lib.optionalString (common.hasServices meta) ''echo "%attr(0644, root, root) /lib/systemd/system/*"''}
       ${lib.optionalString hasEntries ''echo "/usr/share/applications/*"''}
       ${lib.optionalString hasIcons ''echo "/usr/share/icons/hicolor/512x512/apps/*"''}
       echo

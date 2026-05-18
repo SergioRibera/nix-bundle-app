@@ -24,7 +24,9 @@ let
       target
       ;
     format = "pkg";
-    meta = meta // { format = "pkg"; };
+    meta = meta // {
+      format = "pkg";
+    };
   };
 
   innerFile = "${meta.name}-${meta.version}-${utils.darwinArch target.arch}.pkg";
@@ -115,7 +117,8 @@ pkgs.stdenv.mkDerivation {
   nativeBuildInputs = [
     pkgs.coreutils
     pkgs.gnused
-  ] ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.xar ];
+  ]
+  ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.xar ];
 
   buildCommand =
     let

@@ -193,9 +193,7 @@ let
     }:
     let
       mapFile = distroLibMapFile kind;
-      userListFile = pkgs.writeText "user-deps-${kind}.txt" (
-        lib.concatMapStrings (s: s + "\n") userDeps
-      );
+      userListFile = pkgs.writeText "user-deps-${kind}.txt" (lib.concatMapStrings (s: s + "\n") userDeps);
     in
     ''
       {

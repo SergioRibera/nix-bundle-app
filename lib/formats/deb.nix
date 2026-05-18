@@ -52,12 +52,17 @@ pkgs.stdenv.mkDerivation {
       stage = "$stage";
     }}
 
-    ${lib.optionalString meta.autoDepends (deps.discoverLinuxDepsSnippet {
-      kind = "deb";
-      scanDirs = [ "$stage/opt/${meta.name}/bin" "$stage/opt/${meta.name}/lib" ];
-      userDeps = depList;
-      outFile = "deb-depends.csv";
-    })}
+    ${lib.optionalString meta.autoDepends (
+      deps.discoverLinuxDepsSnippet {
+        kind = "deb";
+        scanDirs = [
+          "$stage/opt/${meta.name}/bin"
+          "$stage/opt/${meta.name}/lib"
+        ];
+        userDeps = depList;
+        outFile = "deb-depends.csv";
+      }
+    )}
 
     {
       echo "Package: ${meta.name}"
@@ -77,8 +82,9 @@ pkgs.stdenv.mkDerivation {
         else
           lib.optionalString (depList != [ ]) ''echo "Depends: ${lib.concatStringsSep ", " depList}"''
       }
-      ${lib.optionalString (recommendsList != [ ])
-        ''echo "Recommends: ${lib.concatStringsSep ", " recommendsList}"''}
+      ${lib.optionalString (
+        recommendsList != [ ]
+      ) ''echo "Recommends: ${lib.concatStringsSep ", " recommendsList}"''}
       echo "Description: ${esc description}"
     } > "$stage/DEBIAN/control"
     chmod 644 "$stage/DEBIAN/control"
