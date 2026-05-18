@@ -1301,6 +1301,205 @@ string
 
 
 
+## productbuild
+
+
+
+Settings for the macOS ` productbuild ` distribution format\. Drives the
+welcome / license / readme / conclusion screens and the installer chrome\.
+
+
+
+*Type:*
+submodule
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+## productbuild\.allowCustomize
+
+
+
+If true the installer offers the Customize button\. Useful when the
+distribution contains more than one component\.
+
+
+
+*Type:*
+boolean
+
+
+
+*Default:*
+
+```nix
+false
+```
+
+
+
+## productbuild\.background
+
+
+
+Optional installer background image (png/tiff/jpg)\.
+
+
+
+*Type:*
+null or absolute path or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## productbuild\.conclusion
+
+
+
+Path to a conclusion screen file shown after install completes\.
+
+
+
+*Type:*
+null or absolute path or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## productbuild\.license
+
+
+
+Path to a license file shown on the License screen\.
+
+
+
+*Type:*
+null or absolute path or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## productbuild\.organization
+
+
+
+Reverse-DNS organization id (top half of ` bundleId `)\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## productbuild\.readme
+
+
+
+Path to a readme/release-notes file shown on the Readme screen\.
+
+
+
+*Type:*
+null or absolute path or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## productbuild\.title
+
+
+
+Installer window title\. Defaults to ` info.name ` when null\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## productbuild\.welcome
+
+
+
+Path to a welcome screen file (rtf/rtfd/html/txt)\.
+
+
+
+*Type:*
+null or absolute path or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+*Example:*
+
+```nix
+./Resources/welcome.html
+```
+
+
+
 ## section
 
 
@@ -2033,8 +2232,6 @@ one of “normal”, “severe”, “critical”, “ignore”
 
 
 ## services\.\*\.windows\.serviceName
-
-
 
 ` sc.exe ` service name\. Defaults to the service ` name `\.
 
