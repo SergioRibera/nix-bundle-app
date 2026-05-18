@@ -259,6 +259,75 @@ let
   renderAllSystemd = services: map renderSystemd services;
   renderAllLaunchd = services: map renderLaunchd services;
 
+  # Filename of the service binary (first token of `exec`, basename only).
+  serviceBinName =
+    raw:
+    let
+      s = normalize raw;
+      tok = builtins.head (builtins.filter (x: x != "") (lib.splitString " " s.exec));
+      parts = lib.splitString "/" tok;
+    in
+    lib.last parts;
+
+  # WiX Account= maps our enum to the strings expected by Windows Installer.
+  windowsAccountMsi =
+    a:
+    if a == "LocalSystem" then
+      "LocalSystem"
+    else if a == "LocalService" then
+      "NT AUTHORITY\\LocalService"
+    else if a == "NetworkService" then
+      "NT AUTHORITY\\NetworkService"
+    else
+      a;
+
+  renderMsiServiceInstall =
+    raw:
+    let
+      f = windowsServiceFields raw;
+      svcId = "svc_" + utils.sanitizeName f.svcName;
+      ctlId = "svcctl_" + utils.sanitizeName f.svcName;
+      argsAttr = lib.optionalString (f.args != "") " Arguments=\"${xmlEsc f.args}\"";
+      descAttr = lib.optionalString (f.description != "") " Description=\"${xmlEsc f.description}\"";
+      depXml = lib.concatMapStringsSep "\n  " (
+        d: ''<ServiceDependency Id="${xmlEsc d}"/>''
+      ) f.windows.depends;
+      installOpen = ''<ServiceInstall Id="${svcId}" Name="${xmlEsc f.svcName}" DisplayName="${xmlEsc f.display}" Type="ownProcess" Start="${f.windows.start}" ErrorControl="${f.windows.errorControl}" Account="${windowsAccountMsi f.windows.account}" Vital="yes"${descAttr}${argsAttr}'';
+      install =
+        if f.windows.depends == [ ] then
+          "${installOpen}/>"
+        else
+          "${installOpen}>\n  ${depXml}\n</ServiceInstall>";
+      startInstall = lib.optionalString f.startAtBoot " Start=\"install\"";
+      control = ''<ServiceControl Id="${ctlId}" Name="${xmlEsc f.svcName}"${startInstall} Stop="both" Remove="uninstall" Wait="yes"/>'';
+    in
+    install + "\n" + control;
+
+  # The Windows binary basename for a service. Users typically write exec
+  # in unix style (`/opt/app/bin/app --daemon`); on Windows the actual file
+  # is `app.exe`. Append `.exe` when missing.
+  windowsBinName =
+    raw:
+    let
+      bn = serviceBinName raw;
+    in
+    if lib.hasSuffix ".exe" bn then bn else "${bn}.exe";
+
+  # Maps service-binary basename (with .exe) → concatenated
+  # ServiceInstall/Control XML, used to inject into wixl-heat output.
+  msiServiceXmlByBin =
+    services:
+    lib.foldl' (
+      acc: s:
+      let
+        bn = windowsBinName s;
+        prior = acc.${bn} or "";
+        merged =
+          if prior == "" then renderMsiServiceInstall s else prior + "\n" + renderMsiServiceInstall s;
+      in
+      acc // { ${bn} = merged; }
+    ) { } services;
+
   renderWindowsBundleBat =
     services:
     {
@@ -296,5 +365,9 @@ in
     renderAllLaunchd
     renderWindowsBundleBat
     renderWindowsUninstallBat
+    serviceBinName
+    windowsBinName
+    renderMsiServiceInstall
+    msiServiceXmlByBin
     ;
 }

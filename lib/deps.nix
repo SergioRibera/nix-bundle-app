@@ -167,6 +167,58 @@ let
       ${pkgs.rsync}/bin/rsync -a --copy-links "${drv}/share/" "${destShareDir}/" || true
     fi
   '';
+
+  libMap = (import ./lib-map.nix).sonameMap;
+
+  distroLibMapFile =
+    kind:
+    let
+      sonames = builtins.attrNames libMap;
+      rows = lib.concatMapStringsSep "\n" (
+        n:
+        let
+          pkg = libMap.${n}.${kind} or null;
+        in
+        if pkg == null then "" else "${n}\t${pkg}"
+      ) sonames;
+    in
+    pkgs.writeText "nix-bundle-app-libmap-${kind}.tsv" rows;
+
+  discoverLinuxDepsSnippet =
+    {
+      kind,
+      scanDirs,
+      userDeps,
+      outFile,
+    }:
+    let
+      mapFile = distroLibMapFile kind;
+      userListFile = pkgs.writeText "user-deps-${kind}.txt" (
+        lib.concatMapStrings (s: s + "\n") userDeps
+      );
+    in
+    ''
+      {
+        for d in ${lib.concatStringsSep " " scanDirs}; do
+          [ -d "$d" ] || continue
+          find "$d" -type f \( -name '*.so*' -o -perm -u+x \) -print0 \
+            | while IFS= read -r -d "" f; do
+                if ${pkgs.file}/bin/file -b "$f" | ${pkgs.gnugrep}/bin/grep -q "ELF"; then
+                  ${pkgs.patchelf}/bin/patchelf --print-needed "$f" 2>/dev/null || true
+                fi
+              done
+        done
+      } | tr ' ' '\n' | sort -u > sonames.tmp
+      ${pkgs.gawk}/bin/awk -F'\t' \
+        'NR==FNR { if (NF==2) m[$1]=$2; next } m[$0] { print m[$0] }' \
+        ${mapFile} sonames.tmp \
+        | sort -u > auto-deps.tmp
+      cat ${userListFile} auto-deps.tmp \
+        | ${pkgs.gnused}/bin/sed 's/^ *//;s/ *$//' \
+        | ${pkgs.gnugrep}/bin/grep -v '^$' \
+        | sort -u \
+        | ${pkgs.coreutils}/bin/paste -sd, - > "${outFile}"
+    '';
 in
 {
   inherit
@@ -180,5 +232,8 @@ in
     patchDarwinBinaries
     copyBinaries
     copyResources
+    libMap
+    distroLibMapFile
+    discoverLinuxDepsSnippet
     ;
 }

@@ -99,7 +99,8 @@ Returns a `linkFarm` derivation whose subdirectories are the per-format outputs.
 | `appImageRuntime`          | pinned `fetchurl`            | override AppImage type2 runtime           |
 | `appImageTerminal`         | `false`                      | AppImage `.desktop` Terminal=             |
 | `msiUpgradeCode`           | derived from `bundleId`      | pin to stabilize across releases          |
-| `depends.deb`              | `[ "libc6" ]`                | per-format deps list                      |
+| `autoDepends`              | `true`                       | auto-discover deb/rpm/arch deps from SONAMEs — see [Auto-mapping deps](#auto-mapping-deps) |
+| `depends.deb`              | `[ "libc6" ]`                | merged with auto-discovered                |
 | `depends.rpm`              | `[ "glibc" ]`                |                                           |
 | `depends.archlinux`        | `[ "glibc" ]`                |                                           |
 | `depends.brew`             | `[ ]`                        |                                           |
@@ -183,7 +184,8 @@ Define a service once as a Nix struct; the renderer emits the right artifact per
 | linux   | `/lib/systemd/system/<name>.service`              | `postinst` runs `systemctl daemon-reload && enable --now` |
 | darwin  | `/Library/LaunchDaemons/<label>.plist` (in `.pkg`) | `postinstall` runs `launchctl load -w`            |
 | darwin  | `Contents/Resources/LaunchDaemons/...` (in `.app`) | informational only — manual `launchctl load`      |
-| windows | `install-services.bat` / `uninstall-services.bat` (in payload) | NSIS runs them in Install/Uninstall sections; MSI ships them — auto-run via custom action is on the roadmap |
+| windows (NSIS) | `install-services.bat` / `uninstall-services.bat` (in payload) | NSIS runs them in Install/Uninstall sections |
+| windows (MSI)  | native `<ServiceInstall>` + `<ServiceControl>` rows in the MSI tables | Windows Installer registers, starts, stops and removes the service — no batch script involved |
 
 ```nix
 info.services = [
@@ -234,12 +236,20 @@ info.services = [
 
 The renderer parses `exec` as `"<bin> <args>..."`. On Windows, NSIS rewrites the binary to `%~dp0<exe>` so the service binPath resolves relative to the install directory. Apple `ProgramArguments` is split on spaces too — quote-bearing args aren't handled yet, so for shell-tricky commands wrap them in a launcher script.
 
+### Auto-mapping deps
+
+When `info.autoDepends = true` (the default) the deb, rpm and archlinux formats scan the staged binaries (`/opt/<name>/bin/*` and bundled `/opt/<name>/lib/*.so*`) at build time, extract every `NEEDED` SONAME with `patchelf --print-needed`, and look each one up in a curated SONAME → distro-package table ([`lib/lib-map.nix`](lib/lib-map.nix)).
+
+Matches are merged with whatever the user supplied via `info.depends.<distro>` — auto-detected entries are added in addition, never replacing. SONAMEs that don't appear in the table are silently dropped (set them in `info.depends.<distro>` if you need them).
+
+Set `info.autoDepends = false` to fall back to the literal `info.depends.<distro>` list with no discovery.
+
 ### Format-specific notes
 
 - **`appimage`**: AppDir contains `usr/{bin,lib,share}`, `AppRun` launcher, `.desktop` entry (first of `info.desktopEntries`) and icon (1×1 transparent PNG inserted if none provided). Packed as a SquashFS payload appended to a pinned [type2-runtime](https://github.com/AppImage/type2-runtime) binary. Override the runtime via `info.appImageRuntime = pkgs.fetchurl { ... };`. The bundled libs go into `usr/lib`; `AppRun` exports `LD_LIBRARY_PATH` so the binary picks them up regardless of host.
 - **`pkg`** (macOS): Flat `.pkg` (xar archive: `PackageInfo`, `Bom`, `Payload`, optional `Scripts`). Without services the `.app` ends up at `/Applications/<name>.app`. With `info.services` the layout flips to `install-location="/"` so both `/Applications/<name>.app` and `/Library/LaunchDaemons/<label>.plist` land in the right places; a generated `Scripts/postinstall` runs `launchctl load -w` for each plist. On Linux we build it with `bomutils` + `xar` + `cpio`; the `Bom` may be empty if `mkbom` crashes on the host (modern glibc + bomutils 0.2 is incompatible). On a darwin host the format uses `pkgbuild` for a fully spec-compliant package. Signing is not performed (`rcodesign` / `productsign` integration is on the roadmap).
 - **`brew`**: Works on **macOS and Linux** (linuxbrew). Produces a `Formula.rb` + `.tar.gz`. On darwin, if `info.services` is non-empty the formula gets a `service do ... end` block (Homebrew's built-in launchd integration); on linux the formula installs files only since linuxbrew doesn't manage system services.
-- **`msi`**: Generated via `msitools`' `wixl`. `wixl-heat` scans the staged payload tree and emits the WiX component fragment. Install target is `%ProgramFiles%\<installDirName>`. A Start Menu shortcut and HKCU registry marker are added. The `UpgradeCode` is derived deterministically from `bundleId` — **pin `info.msiUpgradeCode` once you cut your first release** so future MSIs are seen as upgrades.
+- **`msi`**: Generated via `msitools`' `wixl`. `wixl-heat` scans the staged payload tree and emits the WiX component fragment. Install target is `%ProgramFiles%\<installDirName>`. A Start Menu shortcut and HKCU registry marker are added. The `UpgradeCode` is derived deterministically from `bundleId` — **pin `info.msiUpgradeCode` once you cut your first release** so future MSIs are seen as upgrades. When `info.services` is non-empty the bundler post-processes the components fragment and injects `<ServiceInstall>` + `<ServiceControl>` rows tied to the service's exe component — Windows Installer creates, starts, stops and removes the service natively.
 
 ## Examples
 
@@ -308,15 +318,12 @@ The full options reference is autogenerated to [`docs/options.md`](docs/options.
 - **macOS `.pkg` on linux**: built manually because `pkgbuild` is darwin-only. `bomutils-0.2` (the `mkbom` shipping in nixpkgs) crashes under modern glibc FORTIFY checks; when that happens we fall back to an empty `Bom`. Most flat-pkg installers tolerate this, but you lose the receipt file list. Build on darwin for a fully compliant Bom.
 - **AppImage runtime** is pinned to AppImage's `continuous` release. If upstream rotates the binary the hash check fails — supply `info.appImageRuntime = pkgs.fetchurl { url=...; sha256=...; };` to pin your own.
 - **MSI UpgradeCode** is derived from `info.bundleId` by default, which is stable as long as `bundleId` doesn't change. For released artifacts set `info.msiUpgradeCode` explicitly.
-- **Library closure → distro deps**: we don't auto-map nix-store libraries to `Depends:` entries. Use `info.depends.{deb,rpm,archlinux,brew}` to override.
+- **SONAME → distro-pkg map** ships a curated, finite set ([`lib/lib-map.nix`](lib/lib-map.nix)). It covers libc and the most common system libs (openssl, zlib, glib, gtk, qt, X11, wayland, dbus, systemd…). For SONAMEs not in the table, set `info.depends.{deb,rpm,archlinux}` yourself.
 
 ## Roadmap
 
-- `lib.evalModules`-backed schema for `info` (eval-time type validation + assertions)
-- MSI service install via `<ServiceInstall>` (native, no `.bat`)
 - Codesigning hooks (`rcodesign` for macOS, `osslsigncode` for Windows, GPG-signed deb/rpm)
 - macOS productbuild distribution (welcome / license / conclusion screens)
-- Auto-mapping closure libs → distro package names (deb, rpm)
 - AUR-publishable source tarball + signed SRCINFO
 - Flatpak / Snap output
 

@@ -24,22 +24,8 @@ let
   };
   depList = meta.depends.deb or [ ];
   recommendsList = meta.depends.debRecommends or [ ];
-
-  controlLines = builtins.filter (l: l != "") [
-    "Package: ${meta.name}"
-    "Version: ${meta.version}"
-    "Architecture: ${meta.debArch}"
-    "Maintainer: ${meta.maintainer}"
-    "Section: ${meta.section}"
-    "Priority: ${meta.priority}"
-    (lib.optionalString (meta.homepage != "") "Homepage: ${meta.homepage}")
-    (lib.optionalString (depList != [ ]) "Depends: ${lib.concatStringsSep ", " depList}")
-    (lib.optionalString (
-      recommendsList != [ ]
-    ) "Recommends: ${lib.concatStringsSep ", " recommendsList}")
-    "Description: ${if meta.summary != "" then meta.summary else meta.name}"
-  ];
-  controlBody = lib.concatStringsSep "\n" controlLines + "\n";
+  description = if meta.summary != "" then meta.summary else meta.name;
+  esc = s: builtins.replaceStrings [ "/" "&" "\\" ] [ "\\/" "\\&" "\\\\" ] s;
 in
 pkgs.stdenv.mkDerivation {
   name = "${meta.name}-${meta.version}-${meta.debArch}.deb";
@@ -52,6 +38,9 @@ pkgs.stdenv.mkDerivation {
     gnugrep
     rsync
     coreutils
+    gawk
+    gnused
+    findutils
   ];
 
   buildCommand = ''
@@ -63,7 +52,36 @@ pkgs.stdenv.mkDerivation {
       stage = "$stage";
     }}
 
-    ${pkgs.coreutils}/bin/install -m 644 ${pkgs.writeText "control" controlBody} "$stage/DEBIAN/control"
+    ${lib.optionalString meta.autoDepends (deps.discoverLinuxDepsSnippet {
+      kind = "deb";
+      scanDirs = [ "$stage/opt/${meta.name}/bin" "$stage/opt/${meta.name}/lib" ];
+      userDeps = depList;
+      outFile = "deb-depends.csv";
+    })}
+
+    {
+      echo "Package: ${meta.name}"
+      echo "Version: ${meta.version}"
+      echo "Architecture: ${meta.debArch}"
+      echo "Maintainer: ${meta.maintainer}"
+      echo "Section: ${meta.section}"
+      echo "Priority: ${meta.priority}"
+      ${lib.optionalString (meta.homepage != "") ''echo "Homepage: ${meta.homepage}"''}
+      ${
+        if meta.autoDepends then
+          ''
+            if [ -s deb-depends.csv ]; then
+              echo "Depends: $(cat deb-depends.csv)"
+            fi
+          ''
+        else
+          lib.optionalString (depList != [ ]) ''echo "Depends: ${lib.concatStringsSep ", " depList}"''
+      }
+      ${lib.optionalString (recommendsList != [ ])
+        ''echo "Recommends: ${lib.concatStringsSep ", " recommendsList}"''}
+      echo "Description: ${esc description}"
+    } > "$stage/DEBIAN/control"
+    chmod 644 "$stage/DEBIAN/control"
 
     ${lib.optionalString (common.hasServices meta) ''
       cp ${pkgs.writeText "postinst" ''

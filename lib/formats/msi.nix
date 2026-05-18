@@ -15,8 +15,6 @@ let
   winArch = if target.arch == "x86_64" then "x64" else target.arch;
   outFile = "${meta.name}-${meta.version}-${winArch}.msi";
 
-  # Stable per-product upgrade code derived from bundleId.
-  # In a real release you want to pin this — exposed via meta.msiUpgradeCode.
   upgradeCode =
     if meta.msiUpgradeCode or null != null then
       meta.msiUpgradeCode
@@ -30,6 +28,10 @@ let
   programFilesId = if target.arch == "x86_64" then "ProgramFiles64Folder" else "ProgramFilesFolder";
 
   esc = utils.xmlEscape;
+
+  svcXmlByBin = services.msiServiceXmlByBin meta.services;
+  svcBinNames = builtins.attrNames svcXmlByBin;
+
   wxs = ''
     <?xml version="1.0" encoding="UTF-8"?>
     <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
@@ -81,6 +83,41 @@ let
       </Product>
     </Wix>
   '';
+
+  writeServiceXmlFiles = lib.concatMapStringsSep "\n" (bn: ''
+    cp ${pkgs.writeText "msi-svc-${bn}.xml" svcXmlByBin.${bn}} "$svcdir/${bn}.xml"
+  '') svcBinNames;
+
+  injectScript = ''
+    awk -v inj_dir="$svcdir" -v binnames="${lib.concatStringsSep " " svcBinNames}" '
+      BEGIN {
+        n = split(binnames, arr, " ")
+        for (i = 1; i <= n; i++) has[arr[i]] = 1
+        armed = ""
+      }
+      /<File / {
+        if (match($0, /Source="[^"]*"/)) {
+          src = substr($0, RSTART + 8, RLENGTH - 9)
+          np = split(src, parts, "/")
+          bn = parts[np]
+          if (has[bn]) armed = inj_dir "/" bn ".xml"
+        }
+        print
+        next
+      }
+      /<\/Component>/ {
+        if (armed != "") {
+          while ((getline line < armed) > 0) print line
+          close(armed)
+          armed = ""
+        }
+        print
+        next
+      }
+      { print }
+    ' components.wxs > components.wxs.new
+    mv components.wxs.new components.wxs
+  '';
 in
 pkgs.stdenv.mkDerivation {
   name = outFile;
@@ -89,6 +126,7 @@ pkgs.stdenv.mkDerivation {
     msitools
     coreutils
     gnused
+    gawk
     rsync
     findutils
   ];
@@ -102,23 +140,10 @@ pkgs.stdenv.mkDerivation {
     fi
     chmod -R u+w payload
 
-    ${
-      let
-        exeRel = "${meta.name}.exe";
-        installBat = services.renderWindowsBundleBat meta.services { exeRelative = exeRel; };
-        uninstallBat = services.renderWindowsUninstallBat meta.services;
-      in
-      lib.optionalString (meta.services != [ ]) ''
-        cp ${pkgs.writeText "install-services.bat" installBat}   payload/install-services.bat
-        cp ${pkgs.writeText "uninstall-services.bat" uninstallBat} payload/uninstall-services.bat
-      ''
-    }
-
     cp ${pkgs.writeText "installer.wxs" wxs} installer.wxs
     ${pkgs.gnused}/bin/sed -i 's/^    //' installer.wxs
 
-    # Build components fragment from payload contents.
-    ( cd payload && find . -type f -printf '%P\n' ) \
+    find payload -type f \
       | wixl-heat \
           --prefix "payload/" \
           --var "var.SourceDir" \
@@ -127,8 +152,16 @@ pkgs.stdenv.mkDerivation {
           ${lib.optionalString (target.arch == "x86_64") "--win64"} \
         > components.wxs
 
+    ${lib.optionalString (svcBinNames != [ ]) ''
+      svcdir=$PWD/svc-xml
+      mkdir -p "$svcdir"
+      ${writeServiceXmlFiles}
+      ${injectScript}
+    ''}
+
     wixl --arch ${if target.arch == "x86_64" then "x64" else "x86"} \
-         -D SourceDir=. \
+         -D SourceDir=payload \
+         -D Win64=${if target.arch == "x86_64" then "yes" else "no"} \
          -o "${outFile}" \
          installer.wxs components.wxs
 

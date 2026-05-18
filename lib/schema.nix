@@ -551,6 +551,18 @@ in
       '';
     };
 
+    autoDepends = mkOption {
+      type = types.bool;
+      default = true;
+      description = ''
+        For linux package formats (`deb`, `rpm`, `archlinux`), scan the staged
+        binaries' `NEEDED` SONAMEs and add matching distro packages to the
+        manifest's `Depends` / `Requires` / `depends` field. The mapping table
+        ships with the library; user-supplied `info.depends.<distro>` always wins
+        — auto-detected entries are merged in addition, never replacing.
+      '';
+    };
+
     binDir = mkOption {
       type = types.str;
       default = "bin";

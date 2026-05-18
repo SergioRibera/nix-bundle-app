@@ -40,6 +40,8 @@ pkgs.stdenv.mkDerivation {
     rsync
     coreutils
     gnused
+    gawk
+    findutils
   ];
 
   buildCommand = ''
@@ -62,43 +64,70 @@ pkgs.stdenv.mkDerivation {
     # in read-only. Make everything writable so cleanup succeeds.
     chmod -R u+w "$buildroot"
 
-    cat > "$topdir/SPECS/${meta.name}.spec" <<EOF
-    Name: ${meta.name}
-    Version: ${meta.version}
-    Release: 1%{?dist}
-    Summary: ${meta.summary}
-    License: ${meta.license}
-    ${lib.optionalString (meta.homepage != "") "URL: ${meta.homepage}"}
-    Group: ${group}
-    BuildArch: ${meta.rpmArch}
-    AutoReqProv: no
-    ${lib.optionalString (reqs != [ ]) "Requires: ${lib.concatStringsSep ", " reqs}"}
-    ${lib.optionalString (recs != [ ]) "Recommends: ${lib.concatStringsSep ", " recs}"}
+    ${lib.optionalString meta.autoDepends (deps.discoverLinuxDepsSnippet {
+      kind = "rpm";
+      scanDirs = [ "$buildroot/opt/${meta.name}/bin" "$buildroot/opt/${meta.name}/lib" ];
+      userDeps = reqs;
+      outFile = "rpm-requires.csv";
+    })}
 
-    %description
-    ${meta.longDescription}
+    requires_line=""
+    ${
+      if meta.autoDepends then
+        ''
+          if [ -s rpm-requires.csv ]; then
+            requires_line="Requires: $(cat rpm-requires.csv | tr ',' ' ' | tr -s ' ' | sed 's/ /, /g')"
+          fi
+        ''
+      else
+        lib.optionalString (
+          reqs != [ ]
+        ) ''requires_line="Requires: ${lib.concatStringsSep ", " reqs}"''
+    }
 
-    %files
-    %attr(0755, root, root) /opt/${meta.name}
-    /usr/bin/*
-    ${lib.optionalString (common.hasServices meta) "%attr(0644, root, root) /lib/systemd/system/*"}
-    ${lib.optionalString hasEntries "/usr/share/applications/*"}
-    ${lib.optionalString hasIcons "/usr/share/icons/hicolor/512x512/apps/*"}
-
-    %post
+    {
+      echo "Name: ${meta.name}"
+      echo "Version: ${meta.version}"
+      echo "Release: 1%{?dist}"
+      echo "Summary: ${meta.summary}"
+      echo "License: ${meta.license}"
+      ${lib.optionalString (meta.homepage != "") ''echo "URL: ${meta.homepage}"''}
+      echo "Group: ${group}"
+      echo "BuildArch: ${meta.rpmArch}"
+      echo "AutoReqProv: no"
+      [ -n "$requires_line" ] && echo "$requires_line"
+      ${lib.optionalString (recs != [ ])
+        ''echo "Recommends: ${lib.concatStringsSep ", " recs}"''}
+      echo
+      echo "%description"
+      echo "${meta.longDescription}"
+      echo
+      echo "%files"
+      echo "%attr(0755, root, root) /opt/${meta.name}"
+      echo "/usr/bin/*"
+      ${lib.optionalString (common.hasServices meta)
+        ''echo "%attr(0644, root, root) /lib/systemd/system/*"''}
+      ${lib.optionalString hasEntries ''echo "/usr/share/applications/*"''}
+      ${lib.optionalString hasIcons ''echo "/usr/share/icons/hicolor/512x512/apps/*"''}
+      echo
+      echo "%post"
+      cat <<'POST_EOF'
     ${common.postinstSnippet meta}
-
-    %preun
+    POST_EOF
+      echo
+      echo "%preun"
+      cat <<'PREUN_EOF'
     ${common.prermSnippet meta}
-
-    %postun
+    PREUN_EOF
+      echo
+      echo "%postun"
+      cat <<'POSTUN_EOF'
     ${common.postrmSnippet meta}
-
-    %clean
-    rm -rf \$RPM_BUILD_ROOT
-    EOF
-
-    ${pkgs.gnused}/bin/sed -i 's/^    //' "$topdir/SPECS/${meta.name}.spec"
+    POSTUN_EOF
+      echo
+      echo "%clean"
+      echo 'rm -rf $RPM_BUILD_ROOT'
+    } > "$topdir/SPECS/${meta.name}.spec"
 
     mkdir -p "$HOME/tmp"
 
