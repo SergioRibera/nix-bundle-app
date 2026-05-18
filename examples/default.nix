@@ -196,6 +196,20 @@ in
     };
   };
 
+  hello-snap = bundler.bundle {
+    drv = helloLinux;
+    format = "snap";
+    info = commonInfo // {
+      snap = {
+        confinement = "strict";
+        plugs = [
+          "home"
+          "network"
+        ];
+      };
+    };
+  };
+
   hello-pkg = bundler.bundle {
     drv = helloLinux;
     format = "pkg";

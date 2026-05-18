@@ -16,6 +16,7 @@ let
     archlinux = import ./formats/archlinux.nix;
     appimage = import ./formats/appimage.nix;
     flatpak = import ./formats/flatpak.nix;
+    snap = import ./formats/snap.nix;
     "tar.gz" = import ./formats/tarball.nix;
     "tar.xz" = import ./formats/tarball.nix;
     "tar.zst" = import ./formats/tarball.nix;
@@ -36,6 +37,7 @@ let
     archlinux = "linux";
     appimage = "linux";
     flatpak = "linux";
+    snap = "linux";
     app = "darwin";
     dmg = "darwin";
     pkg = "darwin";

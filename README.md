@@ -6,7 +6,7 @@ It does *not* build your program. You hand it a pre-built derivation (e.g. `pkgs
 
 | OS      | Formats                                                                                |
 |---------|----------------------------------------------------------------------------------------|
-| linux   | `deb`, `rpm`, `archlinux`, `appimage`, `flatpak`, `brew` (linuxbrew), `tar.gz`, `tar.xz`, `tar.zst`, `zip` |
+| linux   | `deb`, `rpm`, `archlinux`, `appimage`, `flatpak`, `snap`, `brew` (linuxbrew), `tar.gz`, `tar.xz`, `tar.zst`, `zip` |
 | darwin  | `app`, `dmg`, `pkg`, `productbuild`, `brew`, `tar.gz`, `zip`                           |
 | windows | `nsis` (`.exe`), `msi`, `zip`                                                          |
 
@@ -97,6 +97,7 @@ Set `info.autoDepends = false` to fall back to literal user lists.
 - **`msi`**: `msitools`' `wixl`. `UpgradeCode` derived from `bundleId` — pin `info.msiUpgradeCode` for released artifacts. Services materialise as native `<ServiceInstall>` + `<ServiceControl>` (no `.bat`).
 - **`dmg`** on linux: HFS+ hybrid ISO via `xorrisofs -hfsplus` (not a byte-identical UDIF DMG; Finder mounts it fine).
 - **`flatpak`**: emits a build-ready source layout (`<bundleId>.yaml` manifest + `<name>-<ver>.tar.gz` source tarball + `build.sh` helper). Doesn't produce the final `.flatpak` itself — that requires network access to fetch runtimes, which Nix sandbox forbids. Run `./build.sh` on a flatpak-builder-capable host (it shells out to `flatpak-builder --repo=repo build <appid>.yaml && flatpak build-bundle …`). Tune sandbox permissions with `info.flatpak.finishArgs`, runtime via `info.flatpak.runtime{,Version}`.
+- **`snap`**: emits a `snap/snapcraft.yaml` + staged `payload/` + `build.sh` helper. Real `.snap` requires `snapcraft pack` which spins an LXD/multipass VM — not viable inside Nix sandbox. Run `./build.sh` on a snapcraft-enabled host. Tune confinement via `info.snap.confinement` (`strict`/`classic`/`devmode`), interfaces via `info.snap.plugs`, base via `info.snap.base` (`core22` ↔ Ubuntu 22.04).
 - **`archlinux`**: by default emits a binary `*.pkg.tar.zst` (install with `pacman -U`) AND an AUR-publishable `aur/` subdir (`PKGBUILD` + `.SRCINFO` + `<name>-bin-<ver>-<arch>.tar.gz`). Toggle via `info.archlinux.output = "pkg" | "aur" | "both"` (default `"both"`). Set `info.downloadUrl` so the generated PKGBUILD's `source=()` + `sha256sums=()` point at your release tarball. Push `aur/` to `aur:<name>-bin.git`.
 
 ## Codesigning
@@ -178,10 +179,6 @@ The committed copies are at [`docs/options.md`](docs/options.md) / [`docs/option
 ## Formatter
 
 `nix fmt` runs [`nixfmt-rfc-style`](https://github.com/NixOS/nixfmt) across the tree (wired via the flake's `formatter` output).
-
-## Roadmap
-
-- Flatpak / Snap output
 
 ## License
 

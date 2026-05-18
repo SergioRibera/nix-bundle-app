@@ -134,4 +134,21 @@ in
       test -x "$tmp/opt/${rustName}/bin/${rustName}"
     '';
   };
+
+  rust-snap = e2e {
+    name = "rust-snap";
+    format = "snap";
+    drv = rustLinux;
+    info = rustInfo;
+    expect = "snap/snapcraft.yaml";
+    assertScript = ''
+      bundleDir=$(dirname "$(dirname "$artifact")")
+      test -f "$artifact"
+      test -x "$bundleDir/build.sh"
+      grep -q "name: ${rustName}" "$artifact"
+      grep -q "confinement: strict" "$artifact"
+      grep -q "command: bin/${rustName}" "$artifact"
+      test -x "$bundleDir/payload/opt/${rustName}/bin/${rustName}"
+    '';
+  };
 }
