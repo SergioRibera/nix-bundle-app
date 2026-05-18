@@ -70,8 +70,9 @@ jobs:
           # linkFarm result-linux has one symlink per format
           for d in result-linux/*; do
             [ -e "$d" ] || continue
-            cp -L -r "$d"/* artifacts/linux/ 2>/dev/null || true
+            cp -L -r --no-preserve=mode,ownership "$d"/. artifacts/linux/ 2>/dev/null || true
           done
+          chmod -R u+w artifacts/linux
           ls -lR artifacts/linux
 
       - name: Upload linux bundles
@@ -110,8 +111,9 @@ jobs:
           mkdir -p artifacts/windows
           for d in result-windows/*; do
             [ -e "$d" ] || continue
-            cp -L -r "$d"/* artifacts/windows/ 2>/dev/null || true
+            cp -L -r --no-preserve=mode,ownership "$d"/. artifacts/windows/ 2>/dev/null || true
           done
+          chmod -R u+w artifacts/windows
           ls -lR artifacts/windows
 
       - name: Upload windows bundles
@@ -150,8 +152,9 @@ jobs:
           mkdir -p artifacts/darwin
           for d in result-darwin/*; do
             [ -e "$d" ] || continue
-            cp -L -r "$d"/* artifacts/darwin/ 2>/dev/null || true
+            cp -L -r --no-preserve=mode,ownership "$d"/. artifacts/darwin/ 2>/dev/null || true
           done
+          chmod -R u+w artifacts/darwin
           ls -lR artifacts/darwin
 
       - name: Upload darwin bundles
