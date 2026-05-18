@@ -26,10 +26,19 @@ let
   reqs = meta.depends.archlinux or [ ];
   optDeps = meta.depends.archlinuxOptional or [ ];
 
+  mode = meta.archlinux.output;
+  wantPkg = mode == "pkg" || mode == "both";
+  wantAur = mode == "aur" || mode == "both";
+
   aurPkgname = "${meta.name}-bin";
   aurTarName = "${aurPkgname}-${meta.version}-${pkgArch}.tar.gz";
   downloadUrl =
     if meta.downloadUrl != "" then meta.downloadUrl else "https://example.com/releases/${aurTarName}";
+
+  # Where the AUR files live relative to $out:
+  # - mode = "aur"  → directly in $out
+  # - mode = "both" → in $out/aur (alongside the .pkg.tar.zst)
+  aurDirVar = if mode == "aur" then "$out" else "$out/aur";
 
   installScript = lib.optionalString (common.hasServices meta) ''
     post_install() {
@@ -48,34 +57,14 @@ let
 
   depsArr = lib.concatMapStringsSep " " (d: "'" + d + "'") reqs;
   optDepsArr = lib.concatMapStringsSep " " (d: "'" + d + "'") optDeps;
-in
-pkgs.stdenv.mkDerivation {
-  name = "${meta.name}-${meta.version}-1-${pkgArch}.pkg.tar.zst";
-  dontUnpack = true;
-  nativeBuildInputs = with pkgs; [
-    libarchive
-    zstd
-    gzip
-    gnutar
-    patchelf
-    file
-    gnugrep
-    rsync
-    coreutils
-    gnused
-    gawk
-    findutils
-  ];
 
-  buildCommand = ''
-    stage=$PWD/stage
-    mkdir -p "$stage"
+  drvName =
+    if mode == "aur" then
+      "${aurPkgname}-${meta.version}-${pkgArch}.aur"
+    else
+      "${meta.name}-${meta.version}-1-${pkgArch}.pkg.tar.zst";
 
-    ${common.stageLinux {
-      inherit drv meta target;
-      stage = "$stage";
-    }}
-
+  pkgBlock = lib.optionalString wantPkg ''
     instSize=$(${pkgs.coreutils}/bin/du -sb "$stage" | ${pkgs.coreutils}/bin/cut -f1)
     builddate=$(date +%s)
 
@@ -134,21 +123,20 @@ pkgs.stdenv.mkDerivation {
         .PKGINFO * | ${pkgs.gzip}/bin/gzip -n -9 > .MTREE
     )
 
-    mkdir -p $out
     out_pkg="$out/${meta.name}-${meta.version}-1-${pkgArch}.pkg.tar.zst"
     (
       cd "$stage"
       LANG=C bsdtar --no-fflags -cf - .PKGINFO .MTREE * \
         | ${pkgs.zstd}/bin/zstd -19 -T0 -o "$out_pkg"
     )
+  '';
 
-    # AUR-publishable layout: a source tarball (bin-style payload) plus a
-    # PKGBUILD that downloads it from `info.downloadUrl` + a generated
-    # `.SRCINFO`. Push the trio to `aur:<pkgname>-bin.git`.
-    aurDir=$out/aur
+  aurBlock = lib.optionalString wantAur ''
+    aurDir=${aurDirVar}
     mkdir -p "$aurDir"
 
     aurStage=$PWD/aur-stage
+    rm -rf "$aurStage"
     mkdir -p "$aurStage"
     ( cd "$stage" && ${pkgs.coreutils}/bin/cp -a --no-preserve=ownership . "$aurStage/" )
     rm -f "$aurStage/.PKGINFO" "$aurStage/.MTREE" "$aurStage/.INSTALL"
@@ -213,13 +201,45 @@ pkgs.stdenv.mkDerivation {
       echo ""
       echo "pkgname = ${aurPkgname}"
     } > "$aurDir/.SRCINFO"
+  '';
+in
+pkgs.stdenv.mkDerivation {
+  name = drvName;
+  dontUnpack = true;
+  nativeBuildInputs = with pkgs; [
+    libarchive
+    zstd
+    gzip
+    gnutar
+    patchelf
+    file
+    gnugrep
+    rsync
+    coreutils
+    gnused
+    gawk
+    findutils
+  ];
 
-    # Drop the old local-source PKGBUILD; users should consume aur/ instead.
-    rm -f "$out/PKGBUILD"
+  buildCommand = ''
+    stage=$PWD/stage
+    mkdir -p "$stage"
+
+    ${common.stageLinux {
+      inherit drv meta target;
+      stage = "$stage";
+    }}
+
+    mkdir -p $out
+
+    ${pkgBlock}
+
+    ${aurBlock}
   '';
 
   passthru = {
     info = meta;
     inherit target format;
+    archlinuxMode = mode;
   };
 }

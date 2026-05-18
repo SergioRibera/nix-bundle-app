@@ -88,6 +88,23 @@ in
     info = commonInfo;
   };
 
+  hello-archlinux-pkg-only = bundler.bundle {
+    drv = helloLinux;
+    format = "archlinux";
+    info = commonInfo // {
+      archlinux.output = "pkg";
+    };
+  };
+
+  hello-archlinux-aur-only = bundler.bundle {
+    drv = helloLinux;
+    format = "archlinux";
+    info = commonInfo // {
+      archlinux.output = "aur";
+      downloadUrl = "https://example.com/releases/hello-bin-2.12.3-x86_64.tar.gz";
+    };
+  };
+
   hello-tar-gz = bundler.bundle {
     drv = helloLinux;
     format = "tar.gz";

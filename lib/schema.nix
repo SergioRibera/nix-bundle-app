@@ -403,6 +403,25 @@ let
     };
   };
 
+  archlinuxModule = {
+    options = {
+      output = mkOption {
+        type = types.enum [
+          "pkg"
+          "aur"
+          "both"
+        ];
+        default = "both";
+        description = ''
+          Selects what the `archlinux` format emits:
+          - `pkg`  → only the binary `*.pkg.tar.zst` (install with `pacman -U`).
+          - `aur`  → only an AUR-pushable `PKGBUILD` + `.SRCINFO` + source tarball.
+          - `both` → both, with AUR layout under `aur/`.
+        '';
+      };
+    };
+  };
+
   productbuildModule = {
     options = {
       title = mkOption {
@@ -705,6 +724,12 @@ in
         Settings for the macOS `productbuild` distribution format. Drives the
         welcome / license / readme / conclusion screens and the installer chrome.
       '';
+    };
+
+    archlinux = mkOption {
+      type = types.submodule archlinuxModule;
+      default = { };
+      description = "Settings for the `archlinux` format (binary pkg vs AUR layout).";
     };
 
     assertions = mkOption {

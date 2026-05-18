@@ -96,7 +96,7 @@ Set `info.autoDepends = false` to fall back to literal user lists.
 - **`brew`**: works on **macOS and linuxbrew**. Produces `Formula.rb` + `.tar.gz`. Darwin + `info.services` gets a `service do … end` block (launchd integration).
 - **`msi`**: `msitools`' `wixl`. `UpgradeCode` derived from `bundleId` — pin `info.msiUpgradeCode` for released artifacts. Services materialise as native `<ServiceInstall>` + `<ServiceControl>` (no `.bat`).
 - **`dmg`** on linux: HFS+ hybrid ISO via `xorrisofs -hfsplus` (not a byte-identical UDIF DMG; Finder mounts it fine).
-- **`archlinux`**: emits a binary `*.pkg.tar.zst` (install with `pacman -U`) AND an AUR-publishable `aur/` subdir (`PKGBUILD` + `.SRCINFO` + `<name>-bin-<ver>-<arch>.tar.gz`). Set `info.downloadUrl` to where you'll host the tarball — `PKGBUILD`'s `source=()` and `sha256sums=()` are filled in for you. Push `aur/` to `aur:<name>-bin.git`.
+- **`archlinux`**: by default emits a binary `*.pkg.tar.zst` (install with `pacman -U`) AND an AUR-publishable `aur/` subdir (`PKGBUILD` + `.SRCINFO` + `<name>-bin-<ver>-<arch>.tar.gz`). Toggle via `info.archlinux.output = "pkg" | "aur" | "both"` (default `"both"`). Set `info.downloadUrl` so the generated PKGBUILD's `source=()` + `sha256sums=()` point at your release tarball. Push `aur/` to `aur:<name>-bin.git`.
 
 ## Caveats
 

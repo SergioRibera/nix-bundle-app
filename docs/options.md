@@ -53,6 +53,52 @@ false
 
 
 
+## archlinux
+
+
+
+Settings for the ` archlinux ` format (binary pkg vs AUR layout)\.
+
+
+
+*Type:*
+submodule
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+## archlinux\.output
+
+
+
+Selects what the ` archlinux ` format emits:
+
+ - ` pkg `  → only the binary ` *.pkg.tar.zst ` (install with ` pacman -U `)\.
+ - ` aur `  → only an AUR-pushable ` PKGBUILD ` + ` .SRCINFO ` + source tarball\.
+ - ` both ` → both, with AUR layout under ` aur/ `\.
+
+
+
+*Type:*
+one of “pkg”, “aur”, “both”
+
+
+
+*Default:*
+
+```nix
+"both"
+```
+
+
+
 ## autoDepends
 
 
@@ -2191,8 +2237,6 @@ list of string
 
 ## services\.\*\.windows\.displayName
 
-
-
 Friendly display name (services\.msc)\.
 
 
@@ -2232,6 +2276,8 @@ one of “normal”, “severe”, “critical”, “ignore”
 
 
 ## services\.\*\.windows\.serviceName
+
+
 
 ` sc.exe ` service name\. Defaults to the service ` name `\.
 
