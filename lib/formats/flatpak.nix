@@ -36,16 +36,6 @@ let
 
   finishArgsYaml = lib.concatMapStringsSep "\n" (a: "  - ${a}") fp.finishArgs;
 
-  desktopFilesYaml =
-    if meta.desktopEntries == [ ] then
-      ""
-    else
-      ''
-        # XDG desktop entries staged by the bundle land under
-        # `usr/share/applications/` — copy them into /app/share so the
-        # exported app shows up in launchers.
-      '';
-
   extraModulesYaml =
     if fp.extraModules == [ ] then
       ""

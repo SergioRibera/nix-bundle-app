@@ -5,11 +5,11 @@
   utils,
   desktop,
   services,
-  signing,
   drv,
   format,
   meta,
   target,
+  ...
 }:
 
 let
