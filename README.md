@@ -18,7 +18,7 @@ Bundles ship unsigned out of the Nix sandbox. Opt-in codesigning hooks drop a tu
 {
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   inputs.flake-utils.url = "github:numtide/flake-utils";
-  inputs.nix-bundle-app.url = "github:rustlanges/nix-bundle-app";
+  inputs.nix-bundle-app.url = "github:SergioRibera/nix-bundle-app";
 
   outputs = { nixpkgs, flake-utils, nix-bundle-app, ... }:
     flake-utils.lib.eachDefaultSystem (system:
