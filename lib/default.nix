@@ -43,8 +43,8 @@ let
     dmg = "darwin";
     pkg = "darwin";
     productbuild = "darwin";
-    # Homebrew is supported on macOS AND linuxbrew. Allow any host.
-    brew = "any";
+    # Homebrew: macOS + linuxbrew only.
+    brew = [ "linux" "darwin" ];
     nsis = "windows";
     exe = "windows";
     msi = "windows";
@@ -56,6 +56,30 @@ let
 
   resolveTarget =
     drv: target: if target != null then utils.normalizeTarget target else utils.detectTargetFromDrv drv;
+
+  # `formatOS` values can be: a single os string ("linux"), the wildcard "any",
+  # or a list of os strings (e.g. brew = ["linux" "darwin"]).
+  osMatches =
+    spec: os:
+    if builtins.isList spec then
+      builtins.elem os spec
+    else
+      spec == "any" || spec == os;
+
+  # Per-OS format lists, auto-derived from `formatOS`. Wildcards ("any") and
+  # multi-OS specs are folded into each matching bucket so consumers iterate one
+  # list per platform without hardcoding.
+  targetsByOS =
+    let
+      formatsFor = os: builtins.attrNames (lib.filterAttrs (_: v: osMatches v os) formatOS);
+      anyFmts = builtins.attrNames (lib.filterAttrs (_: v: v == "any") formatOS);
+    in
+    {
+      linux = lib.sort (a: b: a < b) (formatsFor "linux");
+      darwin = lib.sort (a: b: a < b) (formatsFor "darwin");
+      windows = lib.sort (a: b: a < b) (formatsFor "windows");
+      any = anyFmts;
+    };
 
   bundle =
     {
@@ -69,11 +93,13 @@ let
         formatModules.${format}
           or (throw "nix-bundle-app: unknown format '${format}'. Supported: ${lib.concatStringsSep ", " (builtins.attrNames formatModules)}");
       t = resolveTarget drv target;
-      requiredOS = formatOS.${format};
+      allowedOS = formatOS.${format};
+      allowedDesc =
+        if builtins.isList allowedOS then lib.concatStringsSep "|" allowedOS else allowedOS;
       meta =
         assert lib.assertMsg (
-          requiredOS == "any" || requiredOS == t.os
-        ) "nix-bundle-app: format '${format}' requires os='${requiredOS}', got os='${t.os}'.";
+          osMatches allowedOS t.os
+        ) "nix-bundle-app: format '${format}' requires os='${allowedDesc}', got os='${t.os}'.";
         infoLib.normalize info drv t format;
     in
     mod {
@@ -124,5 +150,10 @@ in
   release = releaseLib.release bundle;
   installScripts = releaseLib.installScripts bundle;
   formats = builtins.attrNames formatModules;
+  formatOS = formatOS;
+  targets = targetsByOS;
+  linuxTargets = targetsByOS.linux;
+  darwinTargets = targetsByOS.darwin;
+  windowsTargets = targetsByOS.windows;
   inherit (infoLib) normalize;
 }
