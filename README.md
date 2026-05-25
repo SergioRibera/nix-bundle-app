@@ -48,7 +48,7 @@ Bundles ship unsigned out of the Nix sandbox. Opt-in codesigning hooks drop a tu
 ```nix
 bundler.bundle    { drv; format; info ? {}; target ? null; }
 bundler.bundleAll { drv; formats; info ? {}; target ? null; }
-bundler.release   { info; matrix; baseUrl; installScripts ? true; }
+bundler.release   { info; matrix; releaseUrl; installScripts ? true; }
 bundler.signedApp { bundle; name ? "${bundle.name}-sign"; }
 
 bundler.formats          # [ "app" "appimage" … ]   — all supported formats
@@ -130,7 +130,7 @@ The scripts auto-detect (`uname -s`/`-m` resp. `$env:PROCESSOR_ARCHITECTURE`), p
 ```nix
 packages.hello-release = bundler.release {
   info = { name = "hello"; version = "1.0.0"; license = "MIT"; };
-  baseUrl = "https://github.com/user/repo/releases/download/v\${VERSION}";
+  releaseUrl = "https://github.com/user/repo/releases/download/v\${VERSION}";
 
   matrix = {
     "x86_64-linux"    = { drv = helloLinux;    formats = [ "tar.gz" "deb" "rpm" ]; };

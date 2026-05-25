@@ -347,7 +347,7 @@ in
 
   hello-release = bundler.release {
     info = commonInfo;
-    baseUrl = "https://github.com/example/hello/releases/download/v\${VERSION}";
+    releaseUrl = "https://github.com/example/hello/releases/download/v\${VERSION}";
     matrix = {
       "x86_64-linux" = {
         drv = helloLinux;

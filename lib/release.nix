@@ -99,7 +99,7 @@ let
     {
       name,
       version,
-      baseUrl,
+      releaseUrl,
       entries,
     }:
     ''
@@ -110,10 +110,10 @@ let
 
       NAME='${name}'
       DEFAULT_VERSION='${version}'
-      DEFAULT_BASE_URL='${baseUrl}'
+      DEFAULT_RELEASE_URL='${releaseUrl}'
 
       VERSION=''${VERSION:-$DEFAULT_VERSION}
-      BASE_URL=''${BASE_URL:-$DEFAULT_BASE_URL}
+      RELEASE_URL=''${RELEASE_URL:-$DEFAULT_RELEASE_URL}
       INSTALL_DIR=''${INSTALL_DIR:-"$HOME/.local/bin"}
       FORMAT=''${FORMAT:-}
       UNINSTALL=0
@@ -130,7 +130,7 @@ let
         --list             list configured (arch, os, format) entries
         -h, --help         this help
 
-      Env vars: VERSION, BASE_URL, INSTALL_DIR, FORMAT, SUDO.
+      Env vars: VERSION, RELEASE_URL, INSTALL_DIR, FORMAT, SUDO.
       EOF
       }
 
@@ -153,7 +153,7 @@ let
         esac
       done
 
-      BASE_URL=$(printf '%s' "$BASE_URL" | sed "s|\''${VERSION}|$VERSION|g")
+      RELEASE_URL=$(printf '%s' "$RELEASE_URL" | sed "s|\''${VERSION}|$VERSION|g")
 
       OS=$(uname -s)
       ARCH=$(uname -m)
@@ -225,9 +225,9 @@ let
       verify_sha256() {
         src=$1; file=$2
         if command -v curl >/dev/null 2>&1; then
-          curl -fsSL "$BASE_URL/SHA256SUMS" -o "$tmp/sums" 2>/dev/null || true
+          curl -fsSL "$RELEASE_URL/SHA256SUMS" -o "$tmp/sums" 2>/dev/null || true
         elif command -v wget >/dev/null 2>&1; then
-          wget -qO "$tmp/sums" "$BASE_URL/SHA256SUMS" 2>/dev/null || true
+          wget -qO "$tmp/sums" "$RELEASE_URL/SHA256SUMS" 2>/dev/null || true
         fi
         if [ -s "$tmp/sums" ] && command -v sha256sum >/dev/null 2>&1; then
           expected=$(awk -v f="$file" '$2==f {print $1; exit}' "$tmp/sums")
@@ -355,7 +355,7 @@ let
       tmp=$(mktemp -d)
       trap 'rm -rf "$tmp"' EXIT
 
-      URL="$BASE_URL/$FILE"
+      URL="$RELEASE_URL/$FILE"
       echo "Downloading $URL"
 
       if command -v curl >/dev/null 2>&1; then
@@ -386,7 +386,7 @@ let
     {
       name,
       version,
-      baseUrl,
+      releaseUrl,
       entries,
     }:
     ''
@@ -397,7 +397,7 @@ let
       [CmdletBinding()]
       param(
         [string]$Version = '${version}',
-        [string]$BaseUrl = $null,
+        [string]$ReleaseUrl = $null,
         [string]$Dir     = $null,
         [string]$Format  = $null,
         [switch]$Uninstall,
@@ -407,8 +407,8 @@ let
       $ErrorActionPreference = 'Stop'
       $Name = '${name}'
 
-      if (-not $BaseUrl) {
-        $BaseUrl = '${baseUrl}'.Replace('$' + '{VERSION}', $Version)
+      if (-not $ReleaseUrl) {
+        $ReleaseUrl = '${releaseUrl}'.Replace('$' + '{VERSION}', $Version)
       }
       if (-not $Dir) {
         $Dir = Join-Path $env:LOCALAPPDATA "Programs\$Name"
@@ -466,12 +466,12 @@ let
       $File   = Resolve-File "$Arch`:Windows`:$Picked"
       $Tmp    = New-Item -ItemType Directory -Path (Join-Path $env:TEMP "$Name-$(Get-Random)")
       $Bundle = Join-Path $Tmp.FullName $File
-      $Url    = "$BaseUrl/$File"
+      $Url    = "$ReleaseUrl/$File"
       Write-Host "Downloading $Url"
       Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $Bundle
 
       try {
-        $sums = (Invoke-WebRequest -UseBasicParsing -Uri "$BaseUrl/SHA256SUMS").Content
+        $sums = (Invoke-WebRequest -UseBasicParsing -Uri "$ReleaseUrl/SHA256SUMS").Content
         $esc  = [regex]::Escape($File)
         $line = ($sums -split "`n") | Where-Object { $_ -match "\s$esc\s*$" } | Select-Object -First 1
         if ($line) {
@@ -515,7 +515,7 @@ let
     bundlerBundle:
     {
       info ? { },
-      baseUrl,
+      releaseUrl,
       matrix,
       installScripts ? true,
     }:
@@ -550,13 +550,13 @@ let
       installShText = mkInstallSh {
         name = scriptName;
         version = scriptVersion;
-        inherit baseUrl;
+        inherit releaseUrl;
         entries = sorted;
       };
       installPs1Text = mkInstallPs1 {
         name = scriptName;
         version = scriptVersion;
-        inherit baseUrl;
+        inherit releaseUrl;
         entries = sorted;
       };
 
@@ -570,7 +570,7 @@ let
         passthru = {
           bundles = sorted;
           info = headInfo;
-          inherit baseUrl;
+          inherit releaseUrl;
         };
       }
       ''
