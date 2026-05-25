@@ -95,6 +95,59 @@ let
       e: "  ${archToUname e.arch} ${osToUname e.os} ${e.format} -> ${e.outFile}"
     ) entries;
 
+  expandUrl = url: version: builtins.replaceStrings [ "\${VERSION}" ] [ version ] url;
+
+  mkInstallMd =
+    {
+      name,
+      version,
+      releaseUrl,
+      entries,
+    }:
+    let
+      url = expandUrl releaseUrl version;
+      hasLinux = lib.any (e: e.os == "linux") entries;
+      hasDarwin = lib.any (e: e.os == "darwin") entries;
+      hasWindows = lib.any (e: e.os == "windows") entries;
+      shBlock = lib.optionalString (hasLinux || hasDarwin) ''
+        ### Linux / macOS
+
+        ```sh
+        curl -fsSL ${url}/install.sh | sh
+        ```
+
+      '';
+      psBlock = lib.optionalString hasWindows ''
+        ### Windows (PowerShell)
+
+        ```powershell
+        iwr ${url}/install.ps1 -OutFile install.ps1; .\install.ps1
+        ```
+
+      '';
+      tableRow =
+        e:
+        "| ${archToUname e.arch} | ${osToUname e.os} | `${e.format}` | [`${e.outFile}`](${url}/${e.outFile}) |";
+      table = lib.concatMapStringsSep "\n" tableRow entries;
+    in
+    ''
+      ## Install ${name} ${version}
+
+      ${shBlock}${psBlock}Options: `--format <fmt>`, `--version vX.Y.Z`, `--uninstall`, `--list`, `--help`.
+
+      The installer auto-detects your distro and picks the best matching package — `.deb`, `.rpm`, `.pkg.tar.zst`, `.msi`, or a tarball fallback.
+
+      ### Bundles in this release
+
+      | Arch | OS | Format | File |
+      |------|----|--------|------|
+      ${table}
+
+      All artifacts: <${url}/>
+
+      Verify downloads against [`SHA256SUMS`](${url}/SHA256SUMS).
+    '';
+
   mkInstallSh =
     {
       name,
@@ -559,8 +612,15 @@ let
         inherit releaseUrl;
         entries = sorted;
       };
+      installMdText = mkInstallMd {
+        name = scriptName;
+        version = scriptVersion;
+        inherit releaseUrl;
+        entries = sorted;
+      };
 
       cpLines = lib.concatMapStringsSep "\n" (b: ''
+        mkdir -p "$(dirname "$out/${b.outFile}")"
         cp -L "${b.drv}/${b.outFile}" "$out/${b.outFile}"
         chmod u+w "$out/${b.outFile}"
       '') sorted;
@@ -583,7 +643,11 @@ let
           cp ${pkgs.writeText "install.ps1" installPs1Text} $out/install.ps1
         ''}
 
-        ( cd $out && ${pkgs.coreutils}/bin/sha256sum -- * > SHA256SUMS )
+        cp ${pkgs.writeText "INSTALL.md" installMdText} $out/INSTALL.md
+
+        ( cd $out && ${pkgs.findutils}/bin/find . -type f ! -name SHA256SUMS -printf '%P\n' \
+            | LC_ALL=C sort \
+            | xargs ${pkgs.coreutils}/bin/sha256sum -- > SHA256SUMS )
       '';
 
   installScripts =
