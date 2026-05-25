@@ -10,6 +10,7 @@ on:
       - 'lib/schema.nix'
       - 'lib/info.nix'
       - 'lib/docs.nix'
+      - 'lib/default.nix'
       - 'flake.nix'
       - 'flake.lock'
       - '.github/workflows/docs.yml'
@@ -51,7 +52,8 @@ jobs:
           mkdir -p docs
           cp -L result/share/doc/nix-bundle-app/options.md   docs/options.md
           cp -L result/share/doc/nix-bundle-app/options.json docs/options.json
-          chmod 644 docs/options.md docs/options.json
+          cp -L result/share/doc/nix-bundle-app/targets.md   docs/targets.md
+          chmod 644 docs/options.md docs/options.json docs/targets.md
 
       - name: Commit & push if changed
         run: |
@@ -59,7 +61,7 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add docs/options.md docs/options.json
+          git add docs/options.md docs/options.json docs/targets.md
 
           if git diff --staged --quiet; then
             echo "Schema produced no doc changes; nothing to commit."
