@@ -44,7 +44,10 @@ let
     pkg = "darwin";
     productbuild = "darwin";
     # Homebrew: macOS + linuxbrew only.
-    brew = [ "linux" "darwin" ];
+    brew = [
+      "linux"
+      "darwin"
+    ];
     nsis = "windows";
     exe = "windows";
     msi = "windows";
@@ -60,11 +63,7 @@ let
   # `formatOS` values can be: a single os string ("linux"), the wildcard "any",
   # or a list of os strings (e.g. brew = ["linux" "darwin"]).
   osMatches =
-    spec: os:
-    if builtins.isList spec then
-      builtins.elem os spec
-    else
-      spec == "any" || spec == os;
+    spec: os: if builtins.isList spec then builtins.elem os spec else spec == "any" || spec == os;
 
   # Per-OS format lists, auto-derived from `formatOS`. Wildcards ("any") and
   # multi-OS specs are folded into each matching bucket so consumers iterate one
@@ -94,12 +93,10 @@ let
           or (throw "nix-bundle-app: unknown format '${format}'. Supported: ${lib.concatStringsSep ", " (builtins.attrNames formatModules)}");
       t = resolveTarget drv target;
       allowedOS = formatOS.${format};
-      allowedDesc =
-        if builtins.isList allowedOS then lib.concatStringsSep "|" allowedOS else allowedOS;
+      allowedDesc = if builtins.isList allowedOS then lib.concatStringsSep "|" allowedOS else allowedOS;
       meta =
-        assert lib.assertMsg (
-          osMatches allowedOS t.os
-        ) "nix-bundle-app: format '${format}' requires os='${allowedDesc}', got os='${t.os}'.";
+        assert lib.assertMsg (osMatches allowedOS t.os)
+          "nix-bundle-app: format '${format}' requires os='${allowedDesc}', got os='${t.os}'.";
         infoLib.normalize info drv t format;
     in
     mod {
