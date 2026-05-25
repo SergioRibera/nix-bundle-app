@@ -61,12 +61,16 @@ let
       ${deps.patchLinuxBinaries "$base/bin" target meta.keepInterpreter}
 
       mkdir -p "${stage}/usr/bin"
+      # Relative symlinks (`../../opt/<name>/bin/<file>`) resolve both at the
+      # staged-tree level (so consumers like snap/flatpak can `cp -L` or
+      # dereference safely) and at install-time on the target system, since
+      # `/usr/bin/X` and `/opt/<name>/bin/X` keep the same relative distance.
       if [ -x "$base/bin/${meta.name}" ]; then
-        ln -sf "/opt/${meta.name}/bin/${meta.name}" "${stage}/usr/bin/${meta.name}"
+        ln -srf "$base/bin/${meta.name}" "${stage}/usr/bin/${meta.name}"
       else
         for f in "$base/bin"/*; do
           [ -e "$f" ] || continue
-          ln -sf "/opt/${meta.name}/bin/$(basename "$f")" "${stage}/usr/bin/$(basename "$f")"
+          ln -srf "$f" "${stage}/usr/bin/$(basename "$f")"
         done
       fi
 
