@@ -52,6 +52,19 @@ let
     + plugsBlock
   ) meta.services;
 
+  # If a service shares the binary name with the main app, the daemon entry
+  # already covers `snap run <name>`. Emitting a second top-level app with the
+  # same key produces "found duplicate key" in snapcraft.yaml.
+  hasMainService = lib.any (s: s.name == meta.name) meta.services;
+
+  cliAppBlock = lib.optionalString (!hasMainService) (
+    "  ${meta.name}:\n"
+    + "    command: bin/${meta.name}\n"
+    + "    plugs:\n"
+    + plugsBlock
+    + "\n"
+  );
+
   manifestYaml =
     "name: ${meta.name}\n"
     + "version: '${meta.version}'\n"
@@ -72,11 +85,7 @@ let
     + "      opt/${meta.name}/lib/*: lib/\n"
     + "      opt/${meta.name}/share/*: share/\n"
     + "apps:\n"
-    + "  ${meta.name}:\n"
-    + "    command: bin/${meta.name}\n"
-    + "    plugs:\n"
-    + plugsBlock
-    + "\n"
+    + cliAppBlock
     + lib.optionalString (meta.services != [ ]) (serviceApps + "\n");
 
   buildScript = ''
