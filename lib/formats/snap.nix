@@ -118,6 +118,11 @@ pkgs.stdenv.mkDerivation {
       stage = "$payload";
     }}
 
+    # Snap uses snap-internal paths (bin/, lib/, share/) via the `organize:`
+    # directive — FHS layout under usr/ would duplicate every binary in the
+    # finished .snap. Drop it.
+    rm -rf "$payload/usr"
+
     mkdir -p $out/snap $out/payload
     ${pkgs.coreutils}/bin/cp -a --no-preserve=ownership "$payload"/. $out/payload/
 
