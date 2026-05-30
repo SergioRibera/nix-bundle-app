@@ -40,15 +40,13 @@ let
       while IFS= read -r path; do
         [ "$path" = "${drv}" ] && continue
         [ -d "$path/lib" ] || continue
-        # Skip glibc itself — provides base libs we don't bundle. The
-        # second check uses a glob; under stdenv's `nullglob` an unmatched
-        # `[ -e "$path/lib/libc-2".*.so ]` collapses to `[ -e ]` which
-        # bash treats as true and we'd silently skip every non-glibc path
-        # (e.g. foundationdb's libfdb_c.so). Capture the glob via `set --`
-        # so the test runs against $1 — literal pattern when unmatched, a
-        # real file when matched.
-        set -- "$path"/lib/libc-2.*.so
-        if [ -e "$path/lib/libc.so.6" ] || [ -e "$1" ]; then
+        # Skip glibc itself — provides base libs we don't bundle. Use an
+        # array because stdenv enables `nullglob`: an unmatched glob in
+        # `set --` clears positional params and `$1` becomes unbound,
+        # which trips `set -u` in buildCommand. Arrays give a clean
+        # length check that works in both nullglob and default modes.
+        libc2_matches=( "$path"/lib/libc-2.*.so )
+        if [ -e "$path/lib/libc.so.6" ] || [ "''${#libc2_matches[@]}" -gt 0 ]; then
           continue
         fi
         for so in "$path"/lib/*.so*; do
