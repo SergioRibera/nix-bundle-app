@@ -40,8 +40,15 @@ let
       while IFS= read -r path; do
         [ "$path" = "${drv}" ] && continue
         [ -d "$path/lib" ] || continue
-        # Skip glibc itself — provides base libs we don't bundle.
-        if [ -e "$path/lib/libc.so.6" ] || [ -e "$path/lib/libc-2".*.so ]; then
+        # Skip glibc itself — provides base libs we don't bundle. The
+        # second check uses a glob; under stdenv's `nullglob` an unmatched
+        # `[ -e "$path/lib/libc-2".*.so ]` collapses to `[ -e ]` which
+        # bash treats as true and we'd silently skip every non-glibc path
+        # (e.g. foundationdb's libfdb_c.so). Capture the glob via `set --`
+        # so the test runs against $1 — literal pattern when unmatched, a
+        # real file when matched.
+        set -- "$path"/lib/libc-2.*.so
+        if [ -e "$path/lib/libc.so.6" ] || [ -e "$1" ]; then
           continue
         fi
         for so in "$path"/lib/*.so*; do
