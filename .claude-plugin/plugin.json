@@ -1,0 +1,33 @@
+{
+  "name": "nix-bundle-app",
+  "version": "0.1.0",
+  "description": "Turn any Nix derivation into native installers (.deb, .rpm, AppImage, archlinux, .dmg, .pkg, NSIS .exe, .msi, flatpak, snap, brew, tar/zip) plus cargo-dist-style release matrices with install.sh/install.ps1. Ships a skill that lets Claude package, sign, and release from this flake without scanning the whole tree.",
+  "author": {
+    "name": "Sergio Ribera",
+    "email": "56278796+SergioRibera@users.noreply.github.com",
+    "url": "https://github.com/SergioRibera"
+  },
+  "homepage": "https://github.com/SergioRibera/nix-bundle-app",
+  "repository": "https://github.com/SergioRibera/nix-bundle-app",
+  "license": "MIT",
+  "keywords": [
+    "nix",
+    "flake",
+    "bundle",
+    "installer",
+    "packaging",
+    "deb",
+    "rpm",
+    "appimage",
+    "archlinux",
+    "dmg",
+    "pkg",
+    "nsis",
+    "msi",
+    "flatpak",
+    "snap",
+    "brew",
+    "codesign",
+    "release"
+  ]
+}
