@@ -1,0 +1,33 @@
+{
+  "name": "sergioribera",
+  "owner": {
+    "name": "Sergio Ribera",
+    "email": "56278796+SergioRibera@users.noreply.github.com",
+    "url": "https://github.com/SergioRibera"
+  },
+  "metadata": {
+    "description": "Sergio Ribera's Claude Code plugins.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "nix-bundle-app",
+      "source": "./",
+      "description": "Turn any Nix derivation into native installers (.deb, .rpm, AppImage, archlinux, .dmg, .pkg, NSIS .exe, .msi, flatpak, snap, brew, tar/zip) plus cargo-dist-style release matrices with install.sh/install.ps1.",
+      "version": "0.1.0",
+      "category": "packaging",
+      "tags": [
+        "nix",
+        "flake",
+        "bundle",
+        "installer",
+        "packaging",
+        "release",
+        "codesign"
+      ],
+      "homepage": "https://github.com/SergioRibera/nix-bundle-app",
+      "repository": "https://github.com/SergioRibera/nix-bundle-app",
+      "license": "MIT"
+    }
+  ]
+}
