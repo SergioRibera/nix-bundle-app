@@ -195,9 +195,9 @@ let
         "usr"
         "lib"
       ];
-      fromExtras = map (
-        p: lib.head (lib.splitString "/" (lib.removePrefix "/" p))
-      ) (extraFilesPaths meta);
+      fromExtras = map (p: lib.head (lib.splitString "/" (lib.removePrefix "/" p))) (
+        extraFilesPaths meta
+      );
     in
     lib.unique (base ++ fromExtras);
 in

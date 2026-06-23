@@ -58,11 +58,7 @@ let
   hasMainService = lib.any (s: s.name == meta.name) meta.services;
 
   cliAppBlock = lib.optionalString (!hasMainService) (
-    "  ${meta.name}:\n"
-    + "    command: bin/${meta.name}\n"
-    + "    plugs:\n"
-    + plugsBlock
-    + "\n"
+    "  ${meta.name}:\n" + "    command: bin/${meta.name}\n" + "    plugs:\n" + plugsBlock + "\n"
   );
 
   manifestYaml =
