@@ -60,9 +60,14 @@ let
           # which would otherwise emit a deprecation warning.
           srcFile = if builtins.isString src then pkgs.writeText (baseNameOf dest) src else src;
         in
+        # `${srcFile}` (no `toString`) is what forces Nix to copy a
+        # raw filesystem path into the store AND register it as a
+        # derivation input. Using `toString` returned the filesystem
+        # path verbatim, which the sandboxed builder couldn't see —
+        # `cp` would fail with `No such file or directory`.
         ''
           mkdir -p "$(dirname "${stage}${dest}")"
-          cp -L "${toString srcFile}" "${stage}${dest}"
+          cp -L "${srcFile}" "${stage}${dest}"
           chmod 644 "${stage}${dest}"
         '';
     in
