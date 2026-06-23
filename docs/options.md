@@ -1053,6 +1053,52 @@ string
 
 
 
+## extraFiles
+
+
+
+Extra files dropped into the staged tree at fixed absolute paths\.
+Keys are the destination paths inside the installed package
+(e\.g\. ` /lib/udev/rules.d/61-myapp.rules `)\. Values are either a
+Nix path / store path (copied verbatim) or an inline string
+(materialised via ` pkgs.writeText ` and copied)\.
+
+Honoured by the linux installer formats (` deb `, ` rpm `,
+` archlinux `)\. Ignored by ` appimage ` / ` flatpak ` / ` snap ` (no
+system install location) and by darwin/windows formats\.
+
+If any entry lands under ` /lib/udev/rules.d/ `,
+` /usr/lib/udev/rules.d/ `, or ` /etc/udev/rules.d/ `, the
+post-install hook will additionally run ` udevadm control --reload-rules && udevadm trigger ` (best-effort)\.
+
+
+
+*Type:*
+attribute set of (absolute path or string)
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+*Example:*
+
+```nix
+{
+  "/lib/udev/rules.d/61-myapp.rules" = ./contrib/myapp.rules;
+  "/etc/modprobe.d/myapp.conf" = "options myapp_mod debug=1\n";
+  "/etc/modules-load.d/myapp.conf" = ./contrib/modules-load.conf;
+}
+
+```
+
+
+
 ## flatpak
 
 
@@ -2222,8 +2268,6 @@ attribute set of unspecified value
 
 ## services\.\*\.systemd\.unitOverrides
 
-
-
 Extra ` [Unit] ` fields to set/override\.
 
 
@@ -2242,6 +2286,8 @@ attribute set of unspecified value
 
 
 ## services\.\*\.systemd\.wantedBy
+
+
 
 Targets that pull this unit in via ` WantedBy= `\.
 
