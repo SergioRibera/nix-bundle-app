@@ -110,6 +110,8 @@ Wildcards (`tar.gz`, `tar.xz`, `tar.zst`, `zip`) are host-agnostic. `brew` works
 
 **Services** (cross-OS) — `services = [ { name; exec; description; ... } ]`. One struct → systemd unit (linux), launchd plist (`pkg`), NSIS `.bat`s or native MSI `<ServiceInstall>` (windows). See `references/services-desktop.md`.
 
+**Extra system files** (linux installer formats only) — `extraFiles = { "/lib/udev/rules.d/61-foo.rules" = ./foo.rules; "/etc/modprobe.d/foo.conf" = "options foo bar=1\n"; }`. Keys are absolute install paths, values are Nix paths/store paths or inline strings. Honoured by `deb`, `rpm`, `archlinux`; ignored by `appimage`, `flatpak`, `snap` (no system install location). When any key lands under a known udev rules dir, the post-install hook also runs `udevadm control --reload-rules && udevadm trigger`.
+
 **Format-specific**:
 - `msiUpgradeCode` — pin a UUID for released MSIs (otherwise derived from `bundleId`).
 - `appImageRuntime`, `appImageTerminal`.

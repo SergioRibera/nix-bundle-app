@@ -90,7 +90,7 @@ pkgs.stdenv.mkDerivation {
     } > "$stage/DEBIAN/control"
     chmod 644 "$stage/DEBIAN/control"
 
-    ${lib.optionalString (common.hasServices meta) ''
+    ${lib.optionalString (common.needsPostScripts meta) ''
       cp ${pkgs.writeText "postinst" ''
         #!/bin/sh
         set -e

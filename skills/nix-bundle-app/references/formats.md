@@ -9,19 +9,22 @@ Read the entry for whichever format you're producing. Each section lists: requir
 - Tool: `dpkg-deb`.
 - Output: `<name>_<version>_<arch>.deb` (arch = `amd64`/`arm64`).
 - Layout: payload at `/opt/<installDirName>`, symlinks in `/usr/bin/`.
-- Maintainer scripts: `postinst` enables systemd services; `prerm`/`postrm` clean up.
+- Maintainer scripts: `postinst` enables systemd services; `prerm`/`postrm` clean up. Also runs `udevadm control --reload-rules && udevadm trigger` when `info.extraFiles` writes under `/lib/udev/rules.d/`.
 - `info.depends.deb` merged with auto-detected SONAME deps.
+- `info.extraFiles` materialises raw system files (udev rules, modprobe.d snippets, modules-load.d, …) at the destination paths inside the package.
 - Sign: `dpkg-sig` (embedded) or `gpg --detach-sign` (detached `.sig`).
 
 ### `rpm`
 - Tool: `rpmbuild`.
 - Output: `<name>-<version>-1.<arch>.rpm`.
 - `info.depends.rpmGroup` defaults to `Applications`.
+- `info.extraFiles` entries are enumerated in `%files` and trigger the same udev reload in `%post`/`%postun` as `deb`.
 - Sign: `rpmsign --addsign` (embedded) or detached `.sig`.
 
 ### `archlinux`
 - Tool: `bsdtar` + `zstd`.
 - Default `info.archlinux.output = "both"` → emits *both* a binary `*.pkg.tar.zst` (install via `pacman -U`) **and** an `aur/` subdir with `PKGBUILD`, `.SRCINFO`, `<name>-bin-<ver>-<arch>.tar.gz`.
+- `info.extraFiles` adds the destination top-level dirs (`/etc`, `/lib/udev`, …) to the `package()` copy loop in PKGBUILD and ships them inside the `.pkg.tar.zst`. udev reload lives in `.INSTALL`'s `post_install`/`post_remove`.
 - Set `info.downloadUrl` so PKGBUILD `source=()` + `sha256sums=()` point at your real release tarball.
 - AUR repo convention: `aur:<name>-bin.git`.
 

@@ -41,6 +41,55 @@ let
       '') (map desktop.renderEntry meta.desktopEntries)}
     '';
 
+  # Materialise meta.extraFiles into the staged tree. Each entry is
+  # `<absolute dest path> = <Nix path | inline string>`. Inline strings
+  # become a `pkgs.writeText` whose basename mirrors the destination's
+  # so debug listings (`dpkg -c`, `rpm -qlp`) stay readable.
+  writeExtraFiles =
+    meta: stage:
+    let
+      entries = meta.extraFiles or { };
+      materialise =
+        dest: src:
+        let
+          # Strings get materialised via writeText; anything else
+          # (Nix path, store path, derivation) coerces via the
+          # interpolation below. Distinguishing on `isString`
+          # (rather than `isPath`) keeps derivation-typed values
+          # like `pkgs.writeText ...` out of the writeText path,
+          # which would otherwise emit a deprecation warning.
+          srcFile = if builtins.isString src then pkgs.writeText (baseNameOf dest) src else src;
+        in
+        ''
+          mkdir -p "$(dirname "${stage}${dest}")"
+          cp -L "${toString srcFile}" "${stage}${dest}"
+          chmod 644 "${stage}${dest}"
+        '';
+    in
+    lib.optionalString (entries != { }) (
+      lib.concatStringsSep "\n" (lib.mapAttrsToList materialise entries)
+    );
+
+  # True iff any meta.extraFiles destination lands under a known
+  # udev rules directory — triggers a post-install `udevadm reload`.
+  hasUdevRules =
+    meta:
+    lib.any (
+      k:
+      lib.hasPrefix "/lib/udev/rules.d/" k
+      || lib.hasPrefix "/usr/lib/udev/rules.d/" k
+      || lib.hasPrefix "/etc/udev/rules.d/" k
+    ) (builtins.attrNames (meta.extraFiles or { }));
+
+  udevReloadSnippet =
+    meta:
+    lib.optionalString (hasUdevRules meta) ''
+      if command -v udevadm >/dev/null 2>&1; then
+        udevadm control --reload-rules 2>/dev/null || true
+        udevadm trigger 2>/dev/null || true
+      fi
+    '';
+
   stageLinux =
     {
       drv,
@@ -76,6 +125,7 @@ let
 
       ${writeSystemdUnits meta "${stage}/lib/systemd/system"}
       ${writeDesktopEntries meta stage}
+      ${writeExtraFiles meta stage}
     '';
 
   enabledServiceNames =
@@ -85,14 +135,17 @@ let
 
   postinstSnippet =
     meta:
-    lib.optionalString (hasServices meta) ''
-      if command -v systemctl >/dev/null 2>&1; then
-        systemctl daemon-reload || true
-        ${lib.concatMapStringsSep "\n  " (
-          n: ''systemctl enable --now "${n}.service" 2>/dev/null || true''
-        ) (enabledServiceNames meta)}
-      fi
-    '';
+    lib.concatStrings [
+      (lib.optionalString (hasServices meta) ''
+        if command -v systemctl >/dev/null 2>&1; then
+          systemctl daemon-reload || true
+          ${lib.concatMapStringsSep "\n  " (
+            n: ''systemctl enable --now "${n}.service" 2>/dev/null || true''
+          ) (enabledServiceNames meta)}
+        fi
+      '')
+      (udevReloadSnippet meta)
+    ];
 
   prermSnippet =
     meta:
@@ -107,11 +160,41 @@ let
 
   postrmSnippet =
     meta:
-    lib.optionalString (hasServices meta) ''
-      if command -v systemctl >/dev/null 2>&1; then
-        systemctl daemon-reload || true
-      fi
-    '';
+    lib.concatStrings [
+      (lib.optionalString (hasServices meta) ''
+        if command -v systemctl >/dev/null 2>&1; then
+          systemctl daemon-reload || true
+        fi
+      '')
+      (udevReloadSnippet meta)
+    ];
+
+  # True iff the bundle has any reason to emit maintainer scripts —
+  # services (systemctl daemon-reload + enable) and/or udev rules
+  # (`udevadm control --reload-rules`) both need post-install hooks.
+  needsPostScripts = meta: hasServices meta || hasUdevRules meta;
+
+  # Destination paths from meta.extraFiles, used by rpm/archlinux to
+  # enumerate files in the package manifest.
+  extraFilesPaths = meta: builtins.attrNames (meta.extraFiles or { });
+
+  # Top-level directories the staged tree touches, derived from
+  # extraFiles + the canonical `opt|usr|lib` set the bundler always
+  # writes to. Used by archlinux PKGBUILD `package()` to know which
+  # `$srcdir/<top>` trees to copy into `$pkgdir/`.
+  stageTopLevelDirs =
+    meta:
+    let
+      base = [
+        "opt"
+        "usr"
+        "lib"
+      ];
+      fromExtras = map (
+        p: lib.head (lib.splitString "/" (lib.removePrefix "/" p))
+      ) (extraFilesPaths meta);
+    in
+    lib.unique (base ++ fromExtras);
 in
 {
   inherit
@@ -119,8 +202,12 @@ in
     systemdRenderedUnits
     enabledServiceNames
     hasServices
+    hasUdevRules
+    needsPostScripts
     postinstSnippet
     prermSnippet
     postrmSnippet
+    extraFilesPaths
+    stageTopLevelDirs
     ;
 }

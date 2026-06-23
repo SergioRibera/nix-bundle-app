@@ -6,6 +6,7 @@ let
 in
 import ./hello-bundles.nix args
 // import ./hello-services.nix args
+// import ./hello-extra-files.nix args
 // import ./rust-linux.nix args
 // import ./rust-darwin.nix args
 // import ./rust-windows.nix args

@@ -111,6 +111,7 @@ pkgs.stdenv.mkDerivation {
       ${lib.optionalString (common.hasServices meta) ''echo "%attr(0644, root, root) /lib/systemd/system/*"''}
       ${lib.optionalString hasEntries ''echo "/usr/share/applications/*"''}
       ${lib.optionalString hasIcons ''echo "/usr/share/icons/hicolor/512x512/apps/*"''}
+      ${lib.concatMapStringsSep "\n      " (p: ''echo "${p}"'') (common.extraFilesPaths meta)}
       echo
       echo "%post"
       cat <<'POST_EOF'

@@ -42,6 +42,27 @@ Canonical schema lives in `lib/schema.nix`; this is a hand-curated quick-lookup.
 
 Tip: turn `autoDepends` off and switch to explicit lists when shipping a hermetic bundle with every lib copied — you don't *want* `libc6` listed as a runtime dep because you ship your own.
 
+## Extra system files (linux installer formats)
+
+`extraFiles = { "<dest>" = <src>; ... }` — drop files into the staged tree at fixed install paths. Honoured by `deb`, `rpm`, `archlinux`. Ignored by `appimage`, `flatpak`, `snap` (no system install location), and by darwin/windows formats.
+
+| Key | Type | Meaning |
+|-----|------|---------|
+| destination path | `str` (absolute) | Where the file lands inside the installed package (e.g. `/lib/udev/rules.d/61-foo.rules`, `/etc/modprobe.d/foo.conf`). |
+| source | `path` or `str` | Nix path/store path copied as-is, or an inline string materialised via `pkgs.writeText`. |
+
+When any destination is under `/lib/udev/rules.d/`, `/usr/lib/udev/rules.d/`, or `/etc/udev/rules.d/`, the generated maintainer scripts also run `udevadm control --reload-rules && udevadm trigger` on install/remove.
+
+The maintainer scripts (deb postinst, rpm %post, archlinux `.INSTALL`) are emitted whenever the bundle has either `services` or `extraFiles` with udev rules — pure-data extras still get staged without scripts.
+
+```nix
+info.extraFiles = {
+  "/lib/udev/rules.d/61-foo.rules" = ./contrib/foo.rules;
+  "/etc/modprobe.d/foo.conf"       = "options foo_mod debug=1\n";
+  "/etc/modules-load.d/foo.conf"   = ./contrib/modules-load.conf;
+};
+```
+
 ## Desktop entries
 
 Each entry: `{ name; exec; type ? "Application"; genericName ? null; comment ? null; tryExec ? null; icon ? null; iconPath ? null; categories ? []; mimeTypes ? []; keywords ? []; terminal ? false; startupNotify ? null; startupWMClass ? null; noDisplay ? false; hidden ? false; dbusActivatable ? false; prefersNonDefaultGPU ? false; singleMainWindow ? false; fileName ? "<name>.desktop"; actions ? { <id> = { name; exec; icon ? null; }; }; extra ? {}; }`.

@@ -41,7 +41,7 @@ let
   # - mode = "both" → in $out/aur (alongside the .pkg.tar.zst)
   aurDirVar = if mode == "aur" then "$out" else "$out/aur";
 
-  installScript = lib.optionalString (common.hasServices meta) ''
+  installScript = lib.optionalString (common.needsPostScripts meta) ''
     post_install() {
       ${common.postinstSnippet meta}
     }
@@ -55,6 +55,11 @@ let
       ${common.postrmSnippet meta}
     }
   '';
+
+  pkgTopLevelDirs = common.stageTopLevelDirs meta;
+  packageCopyLines = lib.concatMapStringsSep "\n      " (
+    d: ''cp -a "\$srcdir/${d}" "\$pkgdir/"  2>/dev/null || true''
+  ) pkgTopLevelDirs;
 
   depsArr = lib.concatMapStringsSep " " (d: "'" + d + "'") reqs;
   optDepsArr = lib.concatMapStringsSep " " (d: "'" + d + "'") optDeps;
@@ -112,22 +117,26 @@ let
       '') optDeps}
     } > "$stage/.PKGINFO"
 
-    ${lib.optionalString (common.hasServices meta) ''
+    ${lib.optionalString (common.needsPostScripts meta) ''
       cp ${pkgs.writeText "${meta.name}.install" installScript} "$stage/.INSTALL"
       ${pkgs.gnused}/bin/sed -i 's/install = .*/&\ninstall = ${meta.name}.install/' "$stage/.PKGINFO" || true
     ''}
 
     (
       cd "$stage"
+      mtree_extra=""
+      [ -f .INSTALL ] && mtree_extra=".INSTALL"
       LANG=C bsdtar -cf - --format=mtree \
         --options='!all,use-set,type,uid,gid,mode,time,size,md5,sha256,link' \
-        .PKGINFO * | ${pkgs.gzip}/bin/gzip -n -9 > .MTREE
+        .PKGINFO $mtree_extra * | ${pkgs.gzip}/bin/gzip -n -9 > .MTREE
     )
 
     out_pkg="$out/${meta.name}-${meta.version}-1-${pkgArch}.pkg.tar.zst"
     (
       cd "$stage"
-      LANG=C bsdtar --no-fflags -cf - .PKGINFO .MTREE * \
+      tar_extra=""
+      [ -f .INSTALL ] && tar_extra=".INSTALL"
+      LANG=C bsdtar --no-fflags -cf - .PKGINFO .MTREE $tar_extra * \
         | ${pkgs.zstd}/bin/zstd -19 -T0 -o "$out_pkg"
     )
   '';
@@ -164,17 +173,15 @@ let
     conflicts=("\''${_pkgname}")
     source=("${downloadUrl}")
     sha256sums=("$aurSha")
-    ${lib.optionalString (common.hasServices meta) "install=${aurPkgname}.install"}
+    ${lib.optionalString (common.needsPostScripts meta) "install=${aurPkgname}.install"}
 
     package() {
-      cp -a "\$srcdir/opt"  "\$pkgdir/"  2>/dev/null || true
-      cp -a "\$srcdir/usr"  "\$pkgdir/"  2>/dev/null || true
-      cp -a "\$srcdir/lib"  "\$pkgdir/"  2>/dev/null || true
+      ${packageCopyLines}
     }
     EOF
     ${pkgs.gnused}/bin/sed -i 's/^    //' "$aurDir/PKGBUILD"
 
-    ${lib.optionalString (common.hasServices meta) ''
+    ${lib.optionalString (common.needsPostScripts meta) ''
       cp ${pkgs.writeText "${aurPkgname}.install" installScript} "$aurDir/${aurPkgname}.install"
     ''}
 
@@ -196,7 +203,7 @@ let
       echo "	conflicts = ${meta.name}"
       echo "	source = ${downloadUrl}"
       echo "	sha256sums = $aurSha"
-      ${lib.optionalString (common.hasServices meta) ''
+      ${lib.optionalString (common.needsPostScripts meta) ''
         echo "	install = ${aurPkgname}.install"
       ''}
       echo ""

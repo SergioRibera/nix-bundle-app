@@ -85,6 +85,22 @@ A single service struct materialises as:
 
 Full per-OS overrides (systemd unit/service kvs, launchd processType, sc.exe account/start/errorControl, …) are in [docs/options.md](docs/options.md).
 
+### Extra system files (linux installer formats)
+
+`info.extraFiles` drops arbitrary files into the staged tree at fixed install paths — udev rules, modprobe.d snippets, modules-load.d, polkit policies, AppArmor profiles, anything that needs to land outside `/opt/<name>`. Honoured by `deb`, `rpm`, `archlinux`.
+
+```nix
+info.extraFiles = {
+  "/lib/udev/rules.d/61-hello.rules" = ./contrib/hello.rules;
+  "/etc/modprobe.d/hello.conf"       = "options hello_mod debug=1\n";
+  "/etc/modules-load.d/hello.conf"   = ./contrib/modules-load.conf;
+};
+```
+
+Values can be a Nix path / store path (copied verbatim) or an inline string (materialised via `pkgs.writeText`). When any destination lands under a known udev rules directory the post-install hook also runs `udevadm control --reload-rules && udevadm trigger` so freshly-installed rules take effect without a manual reload.
+
+Ignored by `appimage`, `flatpak`, `snap` (no system install location) and by darwin/windows formats.
+
 ### Auto-discovered distro deps
 
 `info.autoDepends = true` (default) makes the deb/rpm/archlinux formats scan staged binaries with `patchelf --print-needed` and look each SONAME up in [`lib/lib-map.nix`](lib/lib-map.nix) (libc family, openssl, zlib, glib/gtk/qt, X11/wayland, dbus/systemd…). Discovered deps are merged with explicit `info.depends.<distro>`; auto-detected entries never replace user ones. Unknown SONAMEs are dropped silently.
