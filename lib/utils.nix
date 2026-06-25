@@ -108,4 +108,36 @@ rec {
       chars = lib.stringToCharacters s;
     in
     lib.concatStrings (map (c: if ok c then c else "-") chars);
+
+  # Debian package-name policy: lowercase alphanumerics + `-+.` only,
+  # must start with an alphanumeric. dpkg-deb --build rejects anything
+  # else (notably `_`). Used by the deb format to derive a valid
+  # `Package:` field + asset filename from `meta.name` when the caller's
+  # chosen name isn't already debian-compliant. Install paths stay on
+  # the upstream `meta.name` so symlink locations are consistent across
+  # distros — only the deb-visible identifier is rewritten.
+  debName =
+    s:
+    let
+      lower = lib.toLower s;
+      ok =
+        c:
+        (c >= "a" && c <= "z")
+        || (c >= "0" && c <= "9")
+        || c == "-"
+        || c == "+"
+        || c == ".";
+      chars = lib.stringToCharacters lower;
+      mapped = lib.concatStrings (map (c: if ok c then c else "-") chars);
+      # Strip leading non-alphanumeric to satisfy the "must start with
+      # alphanumeric" rule. Cheap belt-and-suspenders — typical inputs
+      # already start with a letter.
+      startsAlnum =
+        c: (c >= "a" && c <= "z") || (c >= "0" && c <= "9");
+      stripped =
+        if mapped == "" || startsAlnum (builtins.substring 0 1 mapped)
+        then mapped
+        else "p-" + mapped;
+    in
+    stripped;
 }

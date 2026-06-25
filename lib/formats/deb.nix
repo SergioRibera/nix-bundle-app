@@ -27,9 +27,14 @@ let
   recommendsList = meta.depends.debRecommends or [ ];
   description = if meta.summary != "" then meta.summary else meta.name;
   esc = s: builtins.replaceStrings [ "/" "&" "\\" ] [ "\\/" "\\&" "\\\\" ] s;
+  # dpkg-deb requires Package + filename to match [a-z0-9][-+.a-z0-9]*.
+  # Sanitize `meta.name` for those two surfaces only; install paths
+  # (`/opt/${meta.name}`) and other manifest text keep the upstream name
+  # so cross-distro layouts stay aligned.
+  pkgName = utils.debName meta.name;
 in
 pkgs.stdenv.mkDerivation {
-  name = "${meta.name}-${meta.version}-${meta.debArch}.deb";
+  name = "${pkgName}-${meta.version}-${meta.debArch}.deb";
   dontUnpack = true;
   nativeBuildInputs = with pkgs; [
     dpkg
@@ -66,7 +71,7 @@ pkgs.stdenv.mkDerivation {
     )}
 
     {
-      echo "Package: ${meta.name}"
+      echo "Package: ${pkgName}"
       echo "Version: ${meta.version}"
       echo "Architecture: ${meta.debArch}"
       echo "Maintainer: ${meta.maintainer}"
@@ -113,7 +118,7 @@ pkgs.stdenv.mkDerivation {
     ''}
 
     mkdir -p $out
-    fakeroot dpkg-deb --build "$stage" "$out/${meta.name}_${meta.version}_${meta.debArch}.deb"
+    fakeroot dpkg-deb --build "$stage" "$out/${pkgName}_${meta.version}_${meta.debArch}.deb"
 
     ${signing.emitSignScript {
       inherit meta format;
@@ -124,6 +129,6 @@ pkgs.stdenv.mkDerivation {
   passthru = {
     info = meta;
     inherit target format;
-    outFile = "${meta.name}_${meta.version}_${meta.debArch}.deb";
+    outFile = "${pkgName}_${meta.version}_${meta.debArch}.deb";
   };
 }
