@@ -104,15 +104,21 @@ let
     }:
     ''
       base="${stage}/opt/${meta.name}"
-      mkdir -p "$base/bin" "$base/lib" "$base/share"
+      mkdir -p "$base/bin" "$base/share"
+      ${lib.optionalString meta.bundleLibs ''mkdir -p "$base/lib"''}
 
       ${deps.copyBinaries drv "$base/bin"}
-      ${deps.copyLinuxLibs drv "$base/lib"}
+      ${lib.optionalString meta.bundleLibs (deps.copyLinuxLibs drv "$base/lib")}
       ${deps.copyResources drv "$base/share"}
 
       chmod -R u+w "$base"
 
-      ${deps.patchLinuxBinaries "$base/bin" target meta.keepInterpreter}
+      ${deps.patchLinuxBinaries {
+        binDir = "$base/bin";
+        inherit target;
+        keepInterpreter = meta.keepInterpreter;
+        setBundledRpath = meta.bundleLibs;
+      }}
 
       mkdir -p "${stage}/usr/bin"
       # Relative symlinks (`../../opt/<name>/bin/<file>`) resolve both at the

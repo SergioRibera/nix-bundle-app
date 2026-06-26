@@ -117,7 +117,12 @@ let
     '';
 
   patchLinuxBinaries =
-    binDir: target: keepInterpreter:
+    {
+      binDir,
+      target,
+      keepInterpreter,
+      setBundledRpath ? true,
+    }:
     let
       interp = utils.linuxInterp target.arch;
     in
@@ -129,7 +134,16 @@ let
             ${lib.optionalString (!keepInterpreter && interp != null) ''
               ${pkgs.patchelf}/bin/patchelf --set-interpreter "${interp}" "$bin" || true
             ''}
-            ${pkgs.patchelf}/bin/patchelf --set-rpath '$ORIGIN/../lib' "$bin" || true
+            ${
+              if setBundledRpath then
+                ''${pkgs.patchelf}/bin/patchelf --set-rpath '$ORIGIN/../lib' "$bin" || true''
+              else
+                # bundleLibs=false: clear the embedded RPATH so the dynamic
+                # loader falls through to the system path. Without this
+                # patchelf may have stamped a /nix/store path from the
+                # source derivation, which doesn't exist on the target.
+                ''${pkgs.patchelf}/bin/patchelf --remove-rpath "$bin" || true''
+            }
           fi
         fi
       done

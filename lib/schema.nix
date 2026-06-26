@@ -857,6 +857,29 @@ in
       '';
     };
 
+    bundleLibs = mkOption {
+      type = types.bool;
+      default = true;
+      description = ''
+        When `true` (the default), Linux package formats copy every
+        non-glibc runtime library out of the derivation's Nix closure
+        into `/opt/<name>/lib/` and rewrite the binaries' `RPATH` to
+        `$ORIGIN/../lib` so the bundled copies resolve first. The
+        produced bundles are self-contained at the cost of being large.
+
+        Set to `false` to ship the binaries naked: no `lib/` dir gets
+        copied, no `RPATH` rewrite happens, and the dynamic linker
+        resolves SONAMEs through the system loader cache. Pair with
+        `autoDepends = true` (or hand-rolled `info.depends.<distro>`)
+        so the produced `.deb` / `.rpm` / `PKGBUILD` declares the
+        runtime libs as install-time deps — the target distro's package
+        manager pulls them in alongside the binary.
+
+        Tarball / archive formats ignore this flag (they have no
+        manifest to declare deps with), so they still bundle.
+      '';
+    };
+
     binDir = mkOption {
       type = types.str;
       default = "bin";

@@ -86,7 +86,14 @@ pkgs.stdenv.mkDerivation {
     ${deps.copyResources drv "$AppDir/usr/share"}
 
     chmod -R u+w "$AppDir"
-    ${deps.patchLinuxBinaries "$AppDir/usr/bin" target meta.keepInterpreter}
+    ${deps.patchLinuxBinaries {
+      binDir = "$AppDir/usr/bin";
+      inherit target;
+      keepInterpreter = meta.keepInterpreter;
+      # AppImage always bundles libs in the squashed image, so RPATH
+      # must point at the bundled tree regardless of `meta.bundleLibs`.
+      setBundledRpath = true;
+    }}
 
     cp ${pkgs.writeText renderedDesktop.filename renderedDesktop.content} \
        "$AppDir/${meta.name}.desktop"
