@@ -623,6 +623,21 @@ let
         mkdir -p "$(dirname "$out/${b.outFile}")"
         cp -L "${b.drv}/${b.outFile}" "$out/${b.outFile}"
         chmod u+w "$out/${b.outFile}"
+        ${lib.optionalString
+          (b.format == "archlinux" && (b.drv.passthru.archlinuxMode or "pkg") == "both")
+          ''
+            # The `archlinux` format with `output = "both"` writes a
+            # PKGBUILD + .SRCINFO + source tarball into `$out/aur/`
+            # alongside the binary `*.pkg.tar.zst`. The release composer
+            # historically only forwarded `outFile`, dropping that AUR
+            # layout. Promote it explicitly so downstream jobs (CI
+            # pipelines pushing to aur.archlinux.org) can find it.
+            if [ -d "${b.drv}/aur" ]; then
+              mkdir -p "$out/aur"
+              ${pkgs.coreutils}/bin/cp -RL "${b.drv}/aur/." "$out/aur/"
+              ${pkgs.coreutils}/bin/chmod -R u+w "$out/aur"
+            fi
+          ''}
       '') sorted;
     in
     pkgs.runCommand "${scriptName}-${scriptVersion}-release"
