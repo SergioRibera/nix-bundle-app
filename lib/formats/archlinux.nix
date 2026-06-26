@@ -33,8 +33,13 @@ let
 
   aurPkgname = "${meta.name}-bin";
   aurTarName = "${aurPkgname}-${meta.version}-${pkgArch}.tar.gz";
+  # `meta.downloadUrl` is a directory prefix (same contract as the
+  # installer / install.md use of `releaseUrl`). Append the tarball
+  # filename so PKGBUILD's `source=()` resolves to a real asset URL.
   downloadUrl =
-    if meta.downloadUrl != "" then meta.downloadUrl else "https://example.com/releases/${aurTarName}";
+    if meta.downloadUrl != ""
+    then "${meta.downloadUrl}/${aurTarName}"
+    else "https://example.com/releases/${aurTarName}";
 
   # Where the AUR files live relative to $out:
   # - mode = "aur"  → directly in $out
