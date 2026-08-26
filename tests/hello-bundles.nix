@@ -8,23 +8,41 @@ let
     check
     drv
     drvWin
+    drvDarwin
     info
     pkgs
+    canNsis
+    canRpm
     ;
+  inherit (pkgs) lib;
 in
-{
-  bundle-deb = check {
-    name = "deb";
-    format = "deb";
-    inherit drv info;
-    expect = "hello_*_amd64.deb";
+lib.optionalAttrs canNsis {
+  bundle-nsis = check {
+    name = "nsis";
+    format = "nsis";
+    drv = drvWin;
+    inherit info;
+    target = {
+      arch = "x86_64";
+      os = "windows";
+    };
+    expect = "hello-*-x64-setup.exe";
   };
-
+}
+// lib.optionalAttrs canRpm {
   bundle-rpm = check {
     name = "rpm";
     format = "rpm";
     inherit drv info;
     expect = "hello-*-1.x86_64.rpm";
+  };
+}
+// {
+  bundle-deb = check {
+    name = "deb";
+    format = "deb";
+    inherit drv info;
+    expect = "hello_*_amd64.deb";
   };
 
   bundle-archlinux = check {
@@ -58,7 +76,8 @@ in
   bundle-app = check {
     name = "app";
     format = "app";
-    inherit drv info;
+    drv = drvDarwin;
+    inherit info;
     target = {
       arch = "x86_64";
       os = "darwin";
@@ -69,7 +88,8 @@ in
   bundle-pkg = check {
     name = "pkg";
     format = "pkg";
-    inherit drv info;
+    drv = drvDarwin;
+    inherit info;
     target = {
       arch = "x86_64";
       os = "darwin";
@@ -80,7 +100,7 @@ in
   bundle-productbuild = check {
     name = "productbuild";
     format = "productbuild";
-    inherit drv;
+    drv = drvDarwin;
     info = info // {
       productbuild = {
         title = "Hello Installer";
@@ -97,7 +117,8 @@ in
   bundle-brew = check {
     name = "brew";
     format = "brew";
-    inherit drv info;
+    drv = drvDarwin;
+    inherit info;
     target = {
       arch = "x86_64";
       os = "darwin";
@@ -114,18 +135,6 @@ in
       os = "linux";
     };
     expect = "hello.rb";
-  };
-
-  bundle-nsis = check {
-    name = "nsis";
-    format = "nsis";
-    drv = drvWin;
-    inherit info;
-    target = {
-      arch = "x86_64";
-      os = "windows";
-    };
-    expect = "hello-*-x64-setup.exe";
   };
 
   bundle-msi = check {

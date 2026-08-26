@@ -10,9 +10,7 @@ on:
       - 'lib/schema.nix'
       - 'lib/info.nix'
       - 'lib/docs.nix'
-      - 'lib/default.nix'
-      - 'flake.nix'
-      - 'flake.lock'
+      - 'overlay.nix'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
@@ -44,7 +42,7 @@ jobs:
             accept-flake-config = true
 
       - name: Build docs derivation
-        run: nix build .#docs -L
+        run: nix-build lib/docs.nix -L -o result
 
       - name: Sync into docs/
         run: |

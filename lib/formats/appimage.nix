@@ -14,16 +14,19 @@
 let
   outFile = "${meta.name}-${meta.version}-${target.arch}.AppImage";
 
-  # Runtime is a ~200KB ELF that mounts the appended squashfs and execs AppRun.
-  # Pinned to AppImage/type2-runtime continuous build. Override via
-  # `info.appImageRuntime = pkgs.fetchurl { url=...; sha256=...; }`.
+  # Pinned to a numbered type2-runtime release, not `continuous` — that tag
+  # is rebuilt in place upstream, which would make the sha256 below go stale.
+  # Bump + refresh the hashes to update, or override per-bundle via
+  # `info.appImageRuntime`.
+  runtimeRelease = "20251108";
+
   defaultRuntime =
     let
-      url = "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-${target.arch}";
+      url = "https://github.com/AppImage/type2-runtime/releases/download/${runtimeRelease}/runtime-${target.arch}";
       sha =
         {
-          "x86_64" = "1rbp65a2fd879l8gylhkb0wx679lbadgl7y0g6p9b0sn8z79shd2";
-          "aarch64" = "118c57yj0fz2nph3y4jasssdhsbs0ivsk91f6i32w2pjbg0sh9vz";
+          "x86_64" = "0396xi3km1yd0z4329lbjxmv82ddc40gd0x8hca0ylcj7i28pjig";
+          "aarch64" = "0i3lv1j8d9yqssh2i97idmdg9xx11jgdairkdpzw1ikwj77xzjq0";
         }
         .${target.arch} or null;
     in
@@ -86,6 +89,10 @@ pkgs.stdenv.mkDerivation {
     ${deps.copyResources drv "$AppDir/usr/share"}
 
     chmod -R u+w "$AppDir"
+    ${deps.verifyStagedBinaries {
+      binDir = "$AppDir/usr/bin";
+      inherit target;
+    }}
     ${deps.patchLinuxBinaries {
       binDir = "$AppDir/usr/bin";
       inherit target;

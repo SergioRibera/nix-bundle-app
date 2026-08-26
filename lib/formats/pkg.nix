@@ -80,8 +80,8 @@ pkgs.stdenv.mkDerivation {
     pkgs.gnused
     pkgs.gzip
     pkgs.cpio
-  ]
-  ++ lib.optionals pkgs.stdenv.isLinux [
+    # For the manual flat-pkg fallback below (`pkgbuild` is never on the
+    # sandboxed build PATH, even on darwin).
     pkgs.bomutils
     pkgs.xar
   ];
@@ -111,7 +111,9 @@ pkgs.stdenv.mkDerivation {
         chmod -R u+w "$root"
       '';
 
-      linuxBuild = ''
+      # Hand-built flat pkg (PackageInfo/Bom/Payload/Scripts, xar'd together)
+      # for when `pkgbuild` isn't available.
+      manualFlatPkgBuild = ''
         ${stageRoot}
         flat=$work/flat
         mkdir -p "$flat"
@@ -145,29 +147,36 @@ pkgs.stdenv.mkDerivation {
             PackageInfo Bom Payload ${lib.optionalString hasServices "Scripts"} )
       '';
 
-      darwinBuild = ''
+      pkgbuildBuild = ''
         ${stageRoot}
         mkdir -p $out
-        if command -v pkgbuild >/dev/null 2>&1; then
-          ${lib.optionalString hasServices ''
-            mkdir -p scripts
-            cp ${pkgs.writeText "postinstall" postinstallText} scripts/postinstall
-            chmod 755 scripts/postinstall
-          ''}
-          pkgbuild \
-            --root "$root" \
-            --identifier "${meta.bundleId}" \
-            --version "${meta.version}" \
-            --install-location ${installLocation} \
-            ${lib.optionalString hasServices "--scripts scripts"} \
-            "$out/${outFile}"
-        else
-          echo "pkgbuild not on PATH; falling back to manual flat pkg" >&2
-          ${pkgs.gnutar}/bin/tar -czf "$out/${outFile}" -C "$root" .
-        fi
+        ${lib.optionalString hasServices ''
+          mkdir -p scripts
+          cp ${pkgs.writeText "postinstall" postinstallText} scripts/postinstall
+          chmod 755 scripts/postinstall
+        ''}
+        pkgbuild \
+          --root "$root" \
+          --identifier "${meta.bundleId}" \
+          --version "${meta.version}" \
+          --install-location ${installLocation} \
+          ${lib.optionalString hasServices "--scripts scripts"} \
+          "$out/${outFile}"
       '';
     in
-    (if pkgs.stdenv.isDarwin then darwinBuild else linuxBuild)
+    (
+      if pkgs.stdenv.isDarwin then
+        ''
+          if command -v pkgbuild >/dev/null 2>&1; then
+            ${pkgbuildBuild}
+          else
+            echo "pkgbuild not on PATH; falling back to manual flat pkg" >&2
+            ${manualFlatPkgBuild}
+          fi
+        ''
+      else
+        manualFlatPkgBuild
+    )
     + signing.emitSignScript {
       inherit meta format;
       artifactGlob = "*.pkg";

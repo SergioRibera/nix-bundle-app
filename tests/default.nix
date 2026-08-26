@@ -1,4 +1,7 @@
-{ pkgs, bundler }:
+{
+  pkgs ? import <nixpkgs> { },
+  bundler ? (pkgs.extend (import ../overlay.nix)).nixBundleApp,
+}:
 
 let
   helpers = import ./lib.nix { inherit pkgs bundler; };

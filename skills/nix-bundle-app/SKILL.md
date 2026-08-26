@@ -1,44 +1,40 @@
 ---
 name: nix-bundle-app
-description: Use this skill whenever the user wants to bundle, package, distribute, or produce native installers from a Nix derivation — `.deb`, `.rpm`, AppImage, archlinux/AUR, `.dmg`, `.pkg`, `.app`, productbuild, NSIS `.exe`, `.msi`, flatpak, snap, brew/linuxbrew, plain `tar.gz`/`tar.xz`/`tar.zst`/`zip`, or a `cargo-dist`-style release matrix with `install.sh`/`install.ps1`. Triggers on phrases like "bundle my app", "make a deb/rpm/dmg/msi/appimage", "ship installers", "release matrix", "distribute my Rust/Go binary cross-platform", "sign my installer", or any mention of `nix-bundle-app`, `bundler.bundle`, `bundler.bundleAll`, `bundler.release`. Trigger even if the user names only one format (e.g. "I just need a .deb"). Use proactively when the user is working inside this repository or consumes its flake.
+description: Use this skill whenever the user wants to bundle, package, distribute, or produce native installers from a Nix derivation — `.deb`, `.rpm`, AppImage, archlinux/AUR, `.dmg`, `.pkg`, `.app`, productbuild, NSIS `.exe`, `.msi`, flatpak, snap, brew/linuxbrew, plain `tar.gz`/`tar.xz`/`tar.zst`/`zip`, or a `cargo-dist`-style release matrix with `install.sh`/`install.ps1`. Triggers on phrases like "bundle my app", "make a deb/rpm/dmg/msi/appimage", "ship installers", "release matrix", "distribute my Rust/Go binary cross-platform", "sign my installer", or any mention of `nix-bundle-app`, `bundler.bundle`, `bundler.bundleAll`, `bundler.release`. Trigger even if the user names only one format (e.g. "I just need a .deb"). Use proactively when the user is working inside this repository or consumes it.
 ---
 
 # nix-bundle-app
 
-A Nix flake that turns any pre-built derivation (`pkgs.hello`, a crane/cargo build, a Go binary, anything with `bin/`) into native installers for Linux, macOS, and Windows. **It does not build the program** — it stages, patches load paths, generates manifests, and packs.
+An overlay ([`overlay.nix`](../../overlay.nix)) that turns any pre-built derivation (`pkgs.hello`, a crane/cargo build, a Go binary, anything with `bin/`) into native installers for Linux, macOS, and Windows. **It does not build the program** — it stages, patches load paths, generates manifests, and packs. No flakes, no separate library entry point — apply the overlay to a `pkgs` and use `pkgs.nixBundleApp`.
 
 ## When to use this skill
 
-Use it whenever the user is producing distributable artifacts from a Nix flake — regardless of which OS or format. If they mention a single format ("just give me a deb"), still use the skill; the flake snippets are uniform across formats.
+Use it whenever the user is producing distributable artifacts from Nix — regardless of which OS or format. If they mention a single format ("just give me a deb"), still use the skill; the snippets are uniform across formats.
 
 Do **not** use it for:
 - Building the program itself (use `pkgs.stdenv.mkDerivation`, crane, buildGoModule, etc.).
-- Signing keys / cert management (the skill emits a `sign.sh` to run *after* `nix build`).
+- Signing keys / cert management (the skill emits a `sign.sh` to run *after* the bundle is built).
 
 ## Quickstart
 
 ```nix
-{
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  inputs.flake-utils.url = "github:numtide/flake-utils";
-  inputs.nix-bundle-app.url = "github:SergioRibera/nix-bundle-app";
-
-  outputs = { nixpkgs, flake-utils, nix-bundle-app, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = nixpkgs.legacyPackages.${system};
-        bundler = nix-bundle-app.lib.mkLib pkgs;
-      in {
-        packages.hello-deb = bundler.bundle {
-          drv = pkgs.hello;
-          format = "deb";
-          info.maintainer = "You <you@example.com>";
-        };
-      });
+let
+  nix-bundle-app = builtins.fetchTarball {
+    url = "https://github.com/SergioRibera/nix-bundle-app/archive/<rev>.tar.gz";
+    sha256 = "..."; # pin a real commit + hash
+  };
+  pkgs = import <nixpkgs> {
+    overlays = [ (import "${nix-bundle-app}/overlay.nix") ];
+  };
+in
+pkgs.nixBundleApp.bundle {
+  drv = pkgs.hello;
+  format = "deb";
+  info.maintainer = "You <you@example.com>";
 }
 ```
 
-`nix build .#hello-deb` → artifact in `result/`.
+`nix-build -E '...' -A hello-deb` → artifact in `result/`. See [`examples/hello`](../../examples/hello) for a complete consumer.
 
 ## API
 
@@ -46,7 +42,7 @@ Do **not** use it for:
 bundler.bundle    { drv; format; info ? {}; target ? null; }
 bundler.bundleAll { drv; formats; info ? {}; target ? null; }   # returns derivation that produces every format
 bundler.release   { info; matrix; releaseUrl; installScripts ? true; }
-bundler.signedApp { bundle; name ? "${bundle.name}-sign"; }     # wraps a bundle as a `nix run` app that signs in user shell
+bundler.signedApp { bundle; name ? "${bundle.name}-sign"; }     # returns a runnable derivation that signs in user shell
 
 bundler.formats          # [ "app" "appimage" "archlinux" "brew" "deb" "dmg" "flatpak" "msi" "nsis" "pkg" "productbuild" "rpm" "snap" "tar.gz" "tar.xz" "tar.zst" "zip" ]
 bundler.linuxTargets     # formats producible for target.os = "linux"
@@ -55,6 +51,8 @@ bundler.windowsTargets   # ... windows
 bundler.targets.<os>     # grouped form
 bundler.formatOS         # raw { format = os | "any" | [os…]; } map
 ```
+
+`bundler` is `pkgs.nixBundleApp` once the overlay is applied — everything here builds derivations or shells out. Pure, pkgs-independent helpers (rendering, schema validation, no building) live under `pkgs.lib.nixBundleApp` instead — `utils`, `desktop`, `services`, `normalize`.
 
 `target` defaults to `drv.system`. Pass `{ arch = "x86_64"; os = "windows"; }` (etc.) for cross-bundling.
 
@@ -134,7 +132,7 @@ Full reference: `docs/options.md` (autogenerated from `lib/schema.nix`).
 
 ```nix
 packages.app-deb = bundler.bundle {
-  drv = self.packages.${system}.my-app;
+  drv = my-app;
   format = "deb";
   info = {
     maintainer = "You <you@example.com>";
@@ -148,7 +146,7 @@ packages.app-deb = bundler.bundle {
 
 ```nix
 packages.app-all = bundler.bundleAll {
-  drv = self.packages.${system}.my-app;
+  drv = my-app;
   formats = [ "deb" "rpm" "archlinux" "appimage" "tar.gz" ];
   inherit info;
 };
@@ -230,11 +228,12 @@ One struct produces: systemd unit on linux (enabled in `postinst`), launchd plis
 ### Sign-then-build-in-one-shot
 
 ```nix
-apps.app-deb-signed = bundler.signedApp { bundle = self.packages.${system}.app-deb; };
+app-deb-signed = bundler.signedApp { bundle = app-deb; };
 ```
 
 ```sh
-GPG_KEY_ID=0xABCDEF1234567890 nix run .#app-deb-signed -- ./dist
+nix-build -A app-deb-signed -o sign-app-deb
+GPG_KEY_ID=0xABCDEF1234567890 ./sign-app-deb/bin/app-deb-sign -- ./dist
 ```
 
 Bundle stays pure & cacheable; sign step runs in user shell where secrets live. See `references/signing.md`.
@@ -266,7 +265,7 @@ info.signing = {
 ```
 
 ```sh
-nix build .#app-deb
+nix-build -A app-deb
 P12_PASSWORD="$(cat ~/.secrets/p12.pw)" ./result/sign.sh   # darwin/windows
 GPG_KEY_ID=0xABCDEF1234567890           ./result/sign.sh   # linux
 ```
@@ -299,17 +298,18 @@ More detail per format: `references/formats.md`.
 
 - **`install_name_tool`** only runs on a darwin host. Linux→darwin bundles copy dylibs but skip load-path rewriting (the binary still references `/nix/store/...`).
 - **`mkbom`** (bomutils 0.2 in nixpkgs) crashes under modern glibc FORTIFY. Linux-built `.pkg` falls back to an empty Bom — most installers tolerate it. Build on darwin for a compliant Bom.
-- **AppImage runtime** is pinned to AppImage's `continuous` release; pass your own via `info.appImageRuntime` for stable releases.
+- **AppImage runtime** is pinned to a numbered type2-runtime release (`runtimeRelease` in `lib/formats/appimage.nix`); pass your own via `info.appImageRuntime` to override.
 - **SONAME map** is curated, not exhaustive. Add unknowns via `info.depends.<distro>`.
 - **`msiUpgradeCode`** — leaving it derived from `bundleId` is fine for first release but locks you in. Pin a UUID before publishing.
 - **`flatpak`/`snap`** never produce final artifacts inside Nix — they always need a post-build `./build.sh` step.
+- **Target mismatches fail the build, not silently**: deb/rpm/archlinux/appimage/app/dmg/pkg/productbuild/tar.gz/zip all verify the staged binary against `target.{os,arch}` via `file` before packing — e.g. accidentally bundling a darwin `drv` with `target.os = "linux"` errors out instead of shipping a broken artifact. `msi`/`nsis` can't be checked this way (binary is embedded in the installer container).
 
 ## Validation & tests
 
 - `info` runs through `lib.evalModules` before any derivation builds. Typos and cross-field assertions (`format = "appimage"` + non-empty `info.services` is rejected, malformed `msiUpgradeCode` rejected, etc.) fail at `nix-instantiate` time.
-- `nix flake check` builds every format against `pkgs.hello` + a sample Rust binary, verifies filenames + payload sanity.
-- `nix fmt` runs `nixfmt-rfc-style` across the tree.
-- `nix build .#docs` regenerates `docs/options.md` from the schema.
+- `nix-build tests` builds every format against `pkgs.hello` + a sample Rust binary, verifies filenames + payload sanity.
+- `nix run nixpkgs#nixfmt-rfc-style -- $(git ls-files '*.nix')` formats the tree.
+- `nix-build lib/docs.nix` regenerates `docs/options.md` from the schema.
 
 ## Reference files
 

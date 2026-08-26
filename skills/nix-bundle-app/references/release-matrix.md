@@ -93,7 +93,7 @@ The install script prefers a binary archive format when picking what to download
 ## CI integration
 
 ```yaml
-- run: nix build .#release
+- run: nix-build -A release -o result
 - uses: softprops/action-gh-release@v2
   with:
     files: result/*

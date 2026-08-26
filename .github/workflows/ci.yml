@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   check:
-    name: nix flake check + lints
+    name: build tests + lints
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -38,8 +38,8 @@ jobs:
       - name: deadnix
         run: nix run nixpkgs#deadnix -- --fail .
 
-      - name: nix flake check
-        run: nix flake check -L --keep-going
+      - name: Build tests (every format against pkgs.hello + a Rust binary)
+        run: nix-build tests -L --keep-going
 
   bundles-linux:
     name: Build + upload linux bundles
@@ -61,7 +61,7 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: Build linux bundles
-        run: nix build .#hello-all-linux -L -o result-linux
+        run: nix-build examples -A hello-all-linux -L -o result-linux
 
       - name: Stage artifacts
         run: |
@@ -103,7 +103,7 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: Build windows bundles (cross-compiled from linux)
-        run: nix build .#hello-all-windows -L -o result-windows
+        run: nix-build examples -A hello-all-windows -L -o result-windows
 
       - name: Stage artifacts
         run: |
@@ -144,7 +144,7 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: Build darwin bundles (cross-staged from linux)
-        run: nix build .#hello-all-darwin -L -o result-darwin
+        run: nix-build examples -A hello-all-darwin -L -o result-darwin
 
       - name: Stage artifacts
         run: |

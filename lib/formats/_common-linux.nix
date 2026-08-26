@@ -113,6 +113,11 @@ let
 
       chmod -R u+w "$base"
 
+      ${deps.verifyStagedBinaries {
+        binDir = "$base/bin";
+        inherit target;
+      }}
+
       ${deps.patchLinuxBinaries {
         binDir = "$base/bin";
         inherit target;

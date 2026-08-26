@@ -7,8 +7,12 @@ let
     check
     drv
     drvWin
+    drvDarwin
     info
+    pkgs
+    canNsis
     ;
+  inherit (pkgs) lib;
 in
 {
   bundle-service-deb = check {
@@ -37,7 +41,7 @@ in
   bundle-service-pkg = check {
     name = "service-pkg";
     format = "pkg";
-    inherit drv;
+    drv = drvDarwin;
     target = {
       arch = "x86_64";
       os = "darwin";
@@ -53,7 +57,8 @@ in
     };
     expect = "hello-*-x86_64.pkg";
   };
-
+}
+// lib.optionalAttrs canNsis {
   bundle-service-nsis = check {
     name = "service-nsis";
     format = "nsis";

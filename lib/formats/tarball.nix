@@ -54,6 +54,10 @@ let
     ${deps.copyBinaries drv "$stage/bin"}
     ${deps.copyDarwinLibs drv "$stage/lib"}
     ${deps.copyResources drv "$stage/share"}
+    ${deps.verifyStagedBinaries {
+      binDir = "$stage/bin";
+      inherit target;
+    }}
   '';
 
   windowsPrep = ''
@@ -64,6 +68,10 @@ let
     if [ -d "${drv}/share" ]; then
       ${pkgs.rsync}/bin/rsync -a --copy-links "${drv}/share/" "$stage/share/" || true
     fi
+    ${deps.verifyStagedBinaries {
+      binDir = "$stage";
+      inherit target;
+    }}
   '';
 
   prep =

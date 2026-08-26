@@ -1,35 +1,39 @@
-{ pkgs }:
-
+# The canonical definition of nix-bundle-app — no flake, no separate library
+# entry point. Pure, pkgs-independent pieces extend `final.lib.nixBundleApp`;
+# everything that builds derivations or shells out lives on
+# `final.nixBundleApp` directly.
+final: prev:
 let
-  lib = pkgs.lib;
+  pkgs = final;
+  lib = final.lib;
 
-  utils = import ./utils.nix { inherit lib; };
-  desktop = import ./desktop.nix { inherit lib; };
-  services = import ./services.nix { inherit lib utils; };
-  infoLib = import ./info.nix { inherit lib utils; };
-  deps = import ./deps.nix { inherit pkgs lib utils; };
-  signing = import ./signing.nix { inherit pkgs lib; };
-  releaseLib = import ./release.nix { inherit pkgs lib; };
+  utils = import ./lib/utils.nix { inherit lib; };
+  desktop = import ./lib/desktop.nix { inherit lib; };
+  services = import ./lib/services.nix { inherit lib utils; };
+  infoLib = import ./lib/info.nix { inherit lib utils; };
+  deps = import ./lib/deps.nix { inherit pkgs lib utils; };
+  signing = import ./lib/signing.nix { inherit pkgs lib; };
+  releaseLib = import ./lib/release.nix { inherit pkgs lib; };
 
   formatModules = {
-    deb = import ./formats/deb.nix;
-    rpm = import ./formats/rpm.nix;
-    archlinux = import ./formats/archlinux.nix;
-    appimage = import ./formats/appimage.nix;
-    flatpak = import ./formats/flatpak.nix;
-    snap = import ./formats/snap.nix;
-    "tar.gz" = import ./formats/tarball.nix;
-    "tar.xz" = import ./formats/tarball.nix;
-    "tar.zst" = import ./formats/tarball.nix;
-    app = import ./formats/app.nix;
-    dmg = import ./formats/dmg.nix;
-    pkg = import ./formats/pkg.nix;
-    productbuild = import ./formats/productbuild.nix;
-    brew = import ./formats/brew.nix;
-    nsis = import ./formats/nsis.nix;
-    exe = import ./formats/nsis.nix;
-    msi = import ./formats/msi.nix;
-    zip = import ./formats/zip.nix;
+    deb = import ./lib/formats/deb.nix;
+    rpm = import ./lib/formats/rpm.nix;
+    archlinux = import ./lib/formats/archlinux.nix;
+    appimage = import ./lib/formats/appimage.nix;
+    flatpak = import ./lib/formats/flatpak.nix;
+    snap = import ./lib/formats/snap.nix;
+    "tar.gz" = import ./lib/formats/tarball.nix;
+    "tar.xz" = import ./lib/formats/tarball.nix;
+    "tar.zst" = import ./lib/formats/tarball.nix;
+    app = import ./lib/formats/app.nix;
+    dmg = import ./lib/formats/dmg.nix;
+    pkg = import ./lib/formats/pkg.nix;
+    productbuild = import ./lib/formats/productbuild.nix;
+    brew = import ./lib/formats/brew.nix;
+    nsis = import ./lib/formats/nsis.nix;
+    exe = import ./lib/formats/nsis.nix;
+    msi = import ./lib/formats/msi.nix;
+    zip = import ./lib/formats/zip.nix;
   };
 
   formatOS = {
@@ -132,25 +136,25 @@ let
       }) formats;
     in
     pkgs.linkFarm "${drv.pname or drv.name or "bundle"}-bundles" built;
-
 in
 {
-  inherit
-    bundle
-    bundleAll
-    utils
-    desktop
-    services
-    signing
-    ;
-  inherit (signing) signedApp;
-  release = releaseLib.release bundle;
-  installScripts = releaseLib.installScripts bundle;
-  formats = builtins.attrNames formatModules;
-  formatOS = formatOS;
-  targets = targetsByOS;
-  linuxTargets = targetsByOS.linux;
-  darwinTargets = targetsByOS.darwin;
-  windowsTargets = targetsByOS.windows;
-  inherit (infoLib) normalize;
+  nixBundleApp = {
+    inherit bundle bundleAll;
+    inherit (signing) signedApp;
+    release = releaseLib.release bundle;
+    installScripts = releaseLib.installScripts bundle;
+    formats = builtins.attrNames formatModules;
+    inherit formatOS;
+    targets = targetsByOS;
+    linuxTargets = targetsByOS.linux;
+    darwinTargets = targetsByOS.darwin;
+    windowsTargets = targetsByOS.windows;
+  };
+
+  lib = (prev.lib or { }) // {
+    nixBundleApp = {
+      inherit utils desktop services;
+      inherit (infoLib) normalize;
+    };
+  };
 }

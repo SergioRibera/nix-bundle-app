@@ -170,6 +170,63 @@ let
     done
   '';
 
+  # What `file -b` prints for a binary built for each target: container
+  # format plus its arch string, which isn't uniform (Mach-O uses Apple's
+  # own "x86_64"/"arm64" naming; ELF/PE use "x86-64"/"aarch64").
+  binarySignature = {
+    linux = {
+      magic = "ELF";
+      arch = {
+        x86_64 = "x86-64";
+        aarch64 = "aarch64";
+      };
+    };
+    darwin = {
+      magic = "Mach-O";
+      arch = {
+        x86_64 = "x86_64";
+        aarch64 = "arm64";
+      };
+    };
+    windows = {
+      magic = "PE32";
+      arch = {
+        x86_64 = "x86-64";
+        aarch64 = "aarch64";
+      };
+    };
+  };
+
+  # Fails the build if a staged binary doesn't match `target`. Non-binaries
+  # (scripts, data files) are left alone.
+  verifyStagedBinaries =
+    { binDir, target }:
+    let
+      sig =
+        binarySignature.${target.os}
+          or (throw "nix-bundle-app: no binary-format signature for os '${target.os}'");
+      archNeedle =
+        sig.arch.${target.arch}
+          or (throw "nix-bundle-app: no binary-format signature for ${target.os}/${target.arch}");
+    in
+    ''
+      for __vb_bin in "${binDir}"/*; do
+        [ -f "$__vb_bin" ] || continue
+        __vb_desc=$(${pkgs.file}/bin/file -b "$__vb_bin" 2>/dev/null) || continue
+        case "$__vb_desc" in
+          *ELF*|*Mach-O*|*PE32*) : ;;
+          *) continue ;; # not a native binary (script, data, …) — nothing to verify
+        esac
+        if
+          ! printf '%s' "$__vb_desc" | ${pkgs.gnugrep}/bin/grep -qF -- "${sig.magic}" \
+          || ! printf '%s' "$__vb_desc" | ${pkgs.gnugrep}/bin/grep -qF -- "${archNeedle}"
+        then
+          echo "nix-bundle-app: '$__vb_bin' does not match target ${target.os}/${target.arch} (file: $__vb_desc)" >&2
+          exit 1
+        fi
+      done
+    '';
+
   copyBinaries = drv: destBinDir: ''
     mkdir -p "${destBinDir}"
     if [ -d "${drv}/bin" ]; then
@@ -247,6 +304,7 @@ in
     copyWindowsDlls
     patchLinuxBinaries
     patchDarwinBinaries
+    verifyStagedBinaries
     copyBinaries
     copyResources
     libMap

@@ -21,6 +21,10 @@ let
     if [ -d "${drv}/share" ]; then
       ${pkgs.rsync}/bin/rsync -a --copy-links "${drv}/share/" "$stage/share/" || true
     fi
+    ${deps.verifyStagedBinaries {
+      binDir = "$stage";
+      inherit target;
+    }}
   '';
 
   darwinPrep = ''
@@ -31,6 +35,10 @@ let
     if [ -d "${drv}/share" ]; then
       ${pkgs.rsync}/bin/rsync -a --copy-links "${drv}/share/" "$stage/share/" || true
     fi
+    ${deps.verifyStagedBinaries {
+      binDir = "$stage/bin";
+      inherit target;
+    }}
   '';
 
   linuxPrep = ''
@@ -41,6 +49,10 @@ let
     if [ -d "${drv}/share" ]; then
       ${pkgs.rsync}/bin/rsync -a --copy-links "${drv}/share/" "$stage/share/" || true
     fi
+    ${deps.verifyStagedBinaries {
+      binDir = "$stage/bin";
+      inherit target;
+    }}
   '';
 
   prep =

@@ -1,9 +1,11 @@
-{ pkgs }:
+{
+  pkgs ? import <nixpkgs> { },
+}:
 
 let
   lib = pkgs.lib;
 
-  bundler = import ./default.nix { inherit pkgs; };
+  bundler = (pkgs.extend (import ../overlay.nix)).nixBundleApp;
 
   fmtList = fmts: lib.concatMapStringsSep ", " (f: "`${f}`") fmts;
 
