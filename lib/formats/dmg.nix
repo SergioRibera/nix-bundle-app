@@ -33,47 +33,48 @@ in
 pkgs.stdenv.mkDerivation {
   name = outFile;
   dontUnpack = true;
-  # Linux: emit an HFS+ hybrid ISO that Finder mounts transparently.
-  # darwin: defer to hdiutil for a real UDIF DMG.
   nativeBuildInputs = [
     pkgs.coreutils
     pkgs.gnused
-  ]
-  ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.xorriso ];
+    pkgs.xorriso
+  ];
 
   buildCommand =
     let
-      linuxBuild = ''
+      stage = ''
         stage=$PWD/dmg-root
         mkdir -p "$stage"
         cp -r ${appBundle}/${meta.name}.app "$stage/"
         chmod -R u+w "$stage"
+      '';
 
-        mkdir -p $out
+      # Real UDIF DMG. `hdiutil` is an unsandboxed macOS system tool, never
+      # on the nix build PATH, so this only ever runs outside the sandbox.
+      hdiutilBuild = ''
+        hdiutil create -volname "${meta.name}" -srcfolder "$stage" \
+          -ov -format UDZO "$out/${outFile}"
+      '';
+
+      # HFS+ hybrid ISO — Finder mounts it transparently, works everywhere.
+      xorrisoBuild = ''
         xorrisofs \
           -hfsplus \
           -V "${meta.name}" \
-          -app-id "${meta.bundleId}" \
+          -appid "${meta.bundleId}" \
           -o "$out/${outFile}" \
           "$stage" 2>/dev/null \
         || ${pkgs.gnutar}/bin/tar -czf "$out/${outFile}" -C "$stage" .
       '';
-
-      darwinBuild = ''
-        stage=$PWD/dmg-root
-        mkdir -p "$stage"
-        cp -r ${appBundle}/${meta.name}.app "$stage/"
-        chmod -R u+w "$stage"
-        mkdir -p $out
-        if command -v hdiutil >/dev/null 2>&1; then
-          hdiutil create -volname "${meta.name}" -srcfolder "$stage" \
-            -ov -format UDZO "$out/${outFile}"
-        else
-          ${pkgs.gnutar}/bin/tar -czf "$out/${outFile}" -C "$stage" .
-        fi
-      '';
     in
-    (if pkgs.stdenv.isDarwin then darwinBuild else linuxBuild)
+    ''
+      ${stage}
+      mkdir -p $out
+      if command -v hdiutil >/dev/null 2>&1; then
+        ${hdiutilBuild}
+      else
+        ${xorrisoBuild}
+      fi
+    ''
     + signing.emitSignScript {
       inherit meta format;
       artifactGlob = "*.dmg";

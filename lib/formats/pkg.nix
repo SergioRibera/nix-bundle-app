@@ -164,19 +164,14 @@ pkgs.stdenv.mkDerivation {
           "$out/${outFile}"
       '';
     in
-    (
-      if pkgs.stdenv.isDarwin then
-        ''
-          if command -v pkgbuild >/dev/null 2>&1; then
-            ${pkgbuildBuild}
-          else
-            echo "pkgbuild not on PATH; falling back to manual flat pkg" >&2
-            ${manualFlatPkgBuild}
-          fi
-        ''
+    ''
+      if command -v pkgbuild >/dev/null 2>&1; then
+        ${pkgbuildBuild}
       else
-        manualFlatPkgBuild
-    )
+        echo "pkgbuild not on PATH; falling back to manual flat pkg" >&2
+        ${manualFlatPkgBuild}
+      fi
+    ''
     + signing.emitSignScript {
       inherit meta format;
       artifactGlob = "*.pkg";

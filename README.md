@@ -245,9 +245,7 @@ The committed copies are at [`docs/options.md`](docs/options.md) / [`docs/option
 
 ## Tests
 
-`nix-build tests` builds every format against `pkgs.hello` and a sample Rust binary, then verifies artifact filenames + payload sanity. [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the same checks on push/PR plus `nixfmt --check` and `deadnix`.
-
-On a darwin host, `nsis` and `rpm` checks are skipped rather than failed — both tools require running on real x86_64-linux, which CI (`ubuntu-latest`) provides but this repo has no local builder for.
+`nix-build tests` builds every format against `pkgs.hello` and a sample Rust binary, then verifies artifact filenames + payload sanity. [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the same checks on `ubuntu-latest` and `macos-latest` (plus `nixfmt --check` and `deadnix` on the former), since neither host alone can produce every format: `rpm`/`nsis` need a real x86_64-linux, and `app`/`pkg`/`productbuild`/`brew`/darwin services need a real darwin binary, which nixpkgs can't cross-compile from linux. Each host skips the checks it can't produce.
 
 [`examples/hello`](examples/hello) is a complete consumer showcasing several formats at once; `examples/default.nix` is the larger internal fixture the tests build against.
 

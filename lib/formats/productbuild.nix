@@ -119,8 +119,8 @@ pkgs.stdenv.mkDerivation {
   nativeBuildInputs = [
     pkgs.coreutils
     pkgs.gnused
-  ]
-  ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.xar ];
+    pkgs.xar
+  ];
 
   buildCommand =
     let
@@ -142,32 +142,31 @@ pkgs.stdenv.mkDerivation {
         ${pkgs.gnused}/bin/sed -i 's/^    //' Distribution
       '';
 
-      linuxBuild = ''
-        ${stageInner}
-        mkdir -p $out
-        # productbuild on darwin would do this; on linux we hand-assemble the
-        # outer xar. Distribution xml + Resources/ + component pkg side by side
-        # is what the Installer.app expects.
+      # Distribution xml + Resources/ + component pkg side by side is what
+      # the Installer.app expects; `productbuild` assembles that into an
+      # outer xar for us, or we hand-assemble the same thing with `xar`.
+      productbuildBuild = ''
+        productbuild \
+          --distribution Distribution \
+          --resources Resources \
+          --package-path . \
+          "$out/${outFile}"
+      '';
+
+      xarBuild = ''
         xar --compression none -cf "$out/${outFile}" \
           Distribution Resources ${innerFile}
       '';
-
-      darwinBuild = ''
-        ${stageInner}
-        mkdir -p $out
-        if command -v productbuild >/dev/null 2>&1; then
-          productbuild \
-            --distribution Distribution \
-            --resources Resources \
-            --package-path . \
-            "$out/${outFile}"
-        else
-          ${pkgs.xar}/bin/xar --compression none -cf "$out/${outFile}" \
-            Distribution Resources ${innerFile}
-        fi
-      '';
     in
-    (if pkgs.stdenv.isDarwin then darwinBuild else linuxBuild)
+    ''
+      ${stageInner}
+      mkdir -p $out
+      if command -v productbuild >/dev/null 2>&1; then
+        ${productbuildBuild}
+      else
+        ${xarBuild}
+      fi
+    ''
     + signing.emitSignScript {
       inherit meta format;
       artifactGlob = "*-install.pkg";

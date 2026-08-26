@@ -1,6 +1,7 @@
-# End-to-end darwin bundle tests for the Rust demo binary. Only extracts the
-# .app/.pkg/etc. payload to check structure, since running the binary
-# requires a darwin host.
+# End-to-end darwin bundle tests for the Rust demo binary. Only runs on a
+# darwin host (gated in tests/default.nix); only extracts the .app/.pkg/etc.
+# payload to check structure, since running the binary still requires the
+# target's exact OS.
 { helpers }:
 
 let

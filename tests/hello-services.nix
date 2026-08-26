@@ -37,7 +37,8 @@ in
     };
     expect = "hello_*_amd64.deb";
   };
-
+}
+// lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
   bundle-service-pkg = check {
     name = "service-pkg";
     format = "pkg";

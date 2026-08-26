@@ -73,6 +73,30 @@ lib.optionalAttrs canNsis {
     expect = "hello-*-x86_64.AppImage";
   };
 
+  bundle-brew-linux = check {
+    name = "brew-linux";
+    format = "brew";
+    inherit drv info;
+    target = {
+      arch = "x86_64";
+      os = "linux";
+    };
+    expect = "hello.rb";
+  };
+
+  bundle-msi = check {
+    name = "msi";
+    format = "msi";
+    drv = drvWin;
+    inherit info;
+    target = {
+      arch = "x86_64";
+      os = "windows";
+    };
+    expect = "hello-*-x64.msi";
+  };
+}
+// lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
   bundle-app = check {
     name = "app";
     format = "app";
@@ -124,28 +148,5 @@ lib.optionalAttrs canNsis {
       os = "darwin";
     };
     expect = "hello.rb";
-  };
-
-  bundle-brew-linux = check {
-    name = "brew-linux";
-    format = "brew";
-    inherit drv info;
-    target = {
-      arch = "x86_64";
-      os = "linux";
-    };
-    expect = "hello.rb";
-  };
-
-  bundle-msi = check {
-    name = "msi";
-    format = "msi";
-    drv = drvWin;
-    inherit info;
-    target = {
-      arch = "x86_64";
-      os = "windows";
-    };
-    expect = "hello-*-x64.msi";
   };
 }
