@@ -1,7 +1,6 @@
 {
-  pkgs,
+  stdenv,
   lib,
-  deps,
   utils,
   desktop,
   services,
@@ -10,15 +9,39 @@
   format,
   meta,
   target,
+  dpkg,
+  fakeroot,
+  patchelf,
+  file,
+  gnugrep,
+  rsync,
+  coreutils,
+  gawk,
+  gnused,
+  findutils,
+  closureInfo,
+  ...
 }:
 
 let
+  deps = import ../deps.nix {
+    inherit
+      lib
+      utils
+      closureInfo
+      coreutils
+      file
+      gawk
+      gnugrep
+      gnused
+      patchelf
+      rsync
+      ;
+  };
   common = import ./_common-linux.nix {
     inherit
-      pkgs
       lib
       deps
-      utils
       desktop
       services
       ;
@@ -33,10 +56,10 @@ let
   # so cross-distro layouts stay aligned.
   pkgName = utils.debName meta.name;
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = "${pkgName}-${meta.version}-${meta.debArch}.deb";
   dontUnpack = true;
-  nativeBuildInputs = with pkgs; [
+  nativeBuildInputs = [
     dpkg
     fakeroot
     patchelf
@@ -96,24 +119,24 @@ pkgs.stdenv.mkDerivation {
     chmod 644 "$stage/DEBIAN/control"
 
     ${lib.optionalString (common.needsPostScripts meta) ''
-      cp ${pkgs.writeText "postinst" ''
-        #!/bin/sh
-        set -e
-        ${common.postinstSnippet meta}
-        exit 0
-      ''} "$stage/DEBIAN/postinst"
-      cp ${pkgs.writeText "prerm" ''
-        #!/bin/sh
-        set -e
-        ${common.prermSnippet meta}
-        exit 0
-      ''} "$stage/DEBIAN/prerm"
-      cp ${pkgs.writeText "postrm" ''
-        #!/bin/sh
-        set -e
-        ${common.postrmSnippet meta}
-        exit 0
-      ''} "$stage/DEBIAN/postrm"
+      cat > "$stage/DEBIAN/postinst" <<'DEB_POSTINST_EOF'
+      #!/bin/sh
+      set -e
+      ${common.postinstSnippet meta}
+      exit 0
+      DEB_POSTINST_EOF
+      cat > "$stage/DEBIAN/prerm" <<'DEB_PRERM_EOF'
+      #!/bin/sh
+      set -e
+      ${common.prermSnippet meta}
+      exit 0
+      DEB_PRERM_EOF
+      cat > "$stage/DEBIAN/postrm" <<'DEB_POSTRM_EOF'
+      #!/bin/sh
+      set -e
+      ${common.postrmSnippet meta}
+      exit 0
+      DEB_POSTRM_EOF
       chmod 755 "$stage/DEBIAN/postinst" "$stage/DEBIAN/prerm" "$stage/DEBIAN/postrm"
     ''}
 

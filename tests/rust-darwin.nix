@@ -1,6 +1,7 @@
-# End-to-end darwin bundle tests for the Rust demo binary. Linux host build —
-# we extract the .app/.pkg/etc. payload to verify structure, since running the
-# binaries requires a darwin host.
+# End-to-end darwin bundle tests for the Rust demo binary. Only runs on a
+# darwin host (gated in tests/default.nix); only extracts the .app/.pkg/etc.
+# payload to check structure, since running the binary still requires the
+# target's exact OS.
 { helpers }:
 
 let
@@ -8,7 +9,7 @@ let
     e2e
     pkgs
     rustInfo
-    rustLinux
+    rustDarwin
     rustName
     rustVersion
     ;
@@ -22,7 +23,7 @@ in
   rust-app = e2e {
     name = "rust-app";
     format = "app";
-    drv = rustLinux;
+    drv = rustDarwin;
     info = rustInfo;
     target = darwinTarget;
     expect = "${rustName}.app";
@@ -37,7 +38,7 @@ in
   rust-pkg = e2e {
     name = "rust-pkg";
     format = "pkg";
-    drv = rustLinux;
+    drv = rustDarwin;
     info = rustInfo;
     target = darwinTarget;
     expect = "${rustName}-${rustVersion}-x86_64.pkg";
@@ -54,7 +55,7 @@ in
   rust-productbuild = e2e {
     name = "rust-productbuild";
     format = "productbuild";
-    drv = rustLinux;
+    drv = rustDarwin;
     info = rustInfo // {
       productbuild = {
         title = "Rust Demo Installer";
@@ -79,7 +80,7 @@ in
   rust-brew = e2e {
     name = "rust-brew";
     format = "brew";
-    drv = rustLinux;
+    drv = rustDarwin;
     info = rustInfo;
     target = darwinTarget;
     expect = "${rustName}.rb";

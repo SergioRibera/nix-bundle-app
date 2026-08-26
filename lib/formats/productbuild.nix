@@ -1,36 +1,19 @@
 {
-  pkgs,
+  stdenv,
   lib,
-  deps,
   utils,
-  desktop,
-  services,
   signing,
-  drv,
   format,
   meta,
   target,
+  componentPkg,
+  coreutils,
+  gnused,
+  xar,
+  ...
 }:
 
 let
-  inner = import ./pkg.nix {
-    inherit
-      pkgs
-      lib
-      deps
-      utils
-      desktop
-      services
-      signing
-      drv
-      target
-      ;
-    format = "pkg";
-    meta = meta // {
-      format = "pkg";
-    };
-  };
-
   innerFile = "${meta.name}-${meta.version}-${utils.darwinArch target.arch}.pkg";
   outFile = "${meta.name}-${meta.version}-${utils.darwinArch target.arch}-install.pkg";
 
@@ -113,21 +96,21 @@ let
       cp "${path}" "Resources/${filenameFor key path}"
     '';
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = outFile;
   dontUnpack = true;
   nativeBuildInputs = [
-    pkgs.coreutils
-    pkgs.gnused
-  ]
-  ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.xar ];
+    coreutils
+    gnused
+    xar
+  ];
 
   buildCommand =
     let
       stageInner = ''
         work=$PWD/dist
         mkdir -p "$work/Resources"
-        cp ${inner}/${innerFile} "$work/${innerFile}"
+        cp ${componentPkg}/${innerFile} "$work/${innerFile}"
         chmod u+w "$work/${innerFile}"
 
         cd "$work"
@@ -137,37 +120,38 @@ pkgs.stdenv.mkDerivation {
         ${copyResource "conclusion"}
         ${copyResource "background"}
 
-        cp ${pkgs.writeText "Distribution" distributionXml} Distribution
+        cat > Distribution <<'DISTRIBUTION_EOF'
+        ${distributionXml}
+        DISTRIBUTION_EOF
         chmod u+w Distribution
-        ${pkgs.gnused}/bin/sed -i 's/^    //' Distribution
+        ${gnused}/bin/sed -i 's/^    //' Distribution
       '';
 
-      linuxBuild = ''
-        ${stageInner}
-        mkdir -p $out
-        # productbuild on darwin would do this; on linux we hand-assemble the
-        # outer xar. Distribution xml + Resources/ + component pkg side by side
-        # is what the Installer.app expects.
+      # Distribution xml + Resources/ + component pkg side by side is what
+      # the Installer.app expects; `productbuild` assembles that into an
+      # outer xar for us, or we hand-assemble the same thing with `xar`.
+      productbuildBuild = ''
+        productbuild \
+          --distribution Distribution \
+          --resources Resources \
+          --package-path . \
+          "$out/${outFile}"
+      '';
+
+      xarBuild = ''
         xar --compression none -cf "$out/${outFile}" \
           Distribution Resources ${innerFile}
       '';
-
-      darwinBuild = ''
-        ${stageInner}
-        mkdir -p $out
-        if command -v productbuild >/dev/null 2>&1; then
-          productbuild \
-            --distribution Distribution \
-            --resources Resources \
-            --package-path . \
-            "$out/${outFile}"
-        else
-          ${pkgs.xar}/bin/xar --compression none -cf "$out/${outFile}" \
-            Distribution Resources ${innerFile}
-        fi
-      '';
     in
-    (if pkgs.stdenv.isDarwin then darwinBuild else linuxBuild)
+    ''
+      ${stageInner}
+      mkdir -p $out
+      if command -v productbuild >/dev/null 2>&1; then
+        ${productbuildBuild}
+      else
+        ${xarBuild}
+      fi
+    ''
     + signing.emitSignScript {
       inherit meta format;
       artifactGlob = "*-install.pkg";
@@ -175,7 +159,11 @@ pkgs.stdenv.mkDerivation {
 
   passthru = {
     info = meta;
-    inherit target format outFile;
-    componentPkg = inner;
+    inherit
+      target
+      format
+      outFile
+      componentPkg
+      ;
   };
 }

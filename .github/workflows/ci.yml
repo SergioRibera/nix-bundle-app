@@ -11,10 +11,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Two hosts because neither can cover every format alone: `rpm`/`nsis`
+  # need to genuinely run on x86_64-linux, and `app`/`pkg`/`productbuild`/
+  # `brew`/darwin services need a genuine darwin binary, which nixpkgs can't
+  # cross-compile from linux. `tests/` skips whichever half a given host
+  # can't produce (`canRpm`/`canNsis`/an `isDarwin` check); between the two
+  # matrix legs, every format gets built somewhere.
   check:
-    name: nix flake check + lints
-    runs-on: ubuntu-latest
+    name: build tests + lints (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -30,16 +39,18 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: nixfmt --check
+        if: matrix.os == 'ubuntu-latest'
         run: |
           mapfile -t files < <(git ls-files '*.nix')
           if [ "${#files[@]}" -eq 0 ]; then exit 0; fi
           nix run nixpkgs#nixfmt-rfc-style -- --check "${files[@]}"
 
       - name: deadnix
+        if: matrix.os == 'ubuntu-latest'
         run: nix run nixpkgs#deadnix -- --fail .
 
-      - name: nix flake check
-        run: nix flake check -L --keep-going
+      - name: Build tests (every format against pkgs.hello + a Rust binary)
+        run: nix-build tests -L --keep-going
 
   bundles-linux:
     name: Build + upload linux bundles
@@ -61,7 +72,7 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: Build linux bundles
-        run: nix build .#hello-all-linux -L -o result-linux
+        run: nix-build examples -A hello-all-linux -L -o result-linux
 
       - name: Stage artifacts
         run: |
@@ -103,7 +114,7 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: Build windows bundles (cross-compiled from linux)
-        run: nix build .#hello-all-windows -L -o result-windows
+        run: nix-build examples -A hello-all-windows -L -o result-windows
 
       - name: Stage artifacts
         run: |
@@ -126,7 +137,7 @@ jobs:
 
   bundles-darwin:
     name: Build + upload darwin bundles
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     timeout-minutes: 60
     needs: check
     steps:
@@ -143,8 +154,8 @@ jobs:
       - name: Cache /nix/store
         uses: DeterminateSystems/magic-nix-cache-action@main
 
-      - name: Build darwin bundles (cross-staged from linux)
-        run: nix build .#hello-all-darwin -L -o result-darwin
+      - name: Build darwin bundles
+        run: nix-build examples -A hello-all-darwin -L -o result-darwin
 
       - name: Stage artifacts
         run: |
