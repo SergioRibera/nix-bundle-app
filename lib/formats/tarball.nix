@@ -20,7 +20,6 @@
   rsync,
   coreutils,
   closureInfo,
-  writeText,
   ...
 }:
 
@@ -41,7 +40,6 @@ let
       gnused
       patchelf
       rsync
-      writeText
       ;
   };
   common = import ./_common-linux.nix {
@@ -50,7 +48,6 @@ let
       deps
       desktop
       services
-      writeText
       ;
   };
 

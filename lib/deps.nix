@@ -9,7 +9,6 @@
   gnused,
   patchelf,
   rsync,
-  writeText,
 }:
 
 let
@@ -254,19 +253,21 @@ let
 
   libMap = (import ./lib-map.nix).sonameMap;
 
+  # Plain string, not a derivation — `discoverLinuxDepsSnippet` heredocs
+  # this straight into the caller's own build sandbox instead of spending a
+  # separate store path just to `cat`/`awk` it back out again.
   distroLibMapFile =
     kind:
     let
       sonames = builtins.attrNames libMap;
-      rows = lib.concatMapStringsSep "\n" (
-        n:
-        let
-          pkg = libMap.${n}.${kind} or null;
-        in
-        if pkg == null then "" else "${n}\t${pkg}"
-      ) sonames;
     in
-    writeText "nix-bundle-app-libmap-${kind}.tsv" rows;
+    lib.concatMapStringsSep "\n" (
+      n:
+      let
+        pkg = libMap.${n}.${kind} or null;
+      in
+      if pkg == null then "" else "${n}\t${pkg}"
+    ) sonames;
 
   discoverLinuxDepsSnippet =
     {
@@ -276,10 +277,15 @@ let
       outFile,
     }:
     let
-      mapFile = distroLibMapFile kind;
-      userListFile = writeText "user-deps-${kind}.txt" (lib.concatMapStrings (s: s + "\n") userDeps);
+      userList = lib.concatMapStrings (s: s + "\n") userDeps;
     in
     ''
+      cat > libmap-${kind}.tsv <<'LIBMAP_EOF'
+      ${distroLibMapFile kind}
+      LIBMAP_EOF
+      cat > user-deps-${kind}.txt <<'USERDEPS_EOF'
+      ${userList}
+      USERDEPS_EOF
       {
         for d in ${lib.concatStringsSep " " scanDirs}; do
           [ -d "$d" ] || continue
@@ -293,9 +299,9 @@ let
       } | tr ' ' '\n' | sort -u > sonames.tmp
       ${gawk}/bin/awk -F'\t' \
         'NR==FNR { if (NF==2) m[$1]=$2; next } m[$0] { print m[$0] }' \
-        ${mapFile} sonames.tmp \
+        libmap-${kind}.tsv sonames.tmp \
         | sort -u > auto-deps.tmp
-      cat ${userListFile} auto-deps.tmp \
+      cat user-deps-${kind}.txt auto-deps.tmp \
         | ${gnused}/bin/sed 's/^ *//;s/ *$//' \
         | ${gnugrep}/bin/grep -v '^$' \
         | sort -u \

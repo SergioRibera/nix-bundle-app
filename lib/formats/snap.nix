@@ -19,8 +19,6 @@
   gawk,
   findutils,
   closureInfo,
-  writeText,
-  writeShellScript,
   ...
 }:
 
@@ -42,7 +40,6 @@ let
       gnused
       patchelf
       rsync
-      writeText
       ;
   };
   common = import ./_common-linux.nix {
@@ -51,7 +48,6 @@ let
       deps
       desktop
       services
-      writeText
       ;
   };
 
@@ -157,8 +153,12 @@ stdenv.mkDerivation {
     mkdir -p $out/snap $out/payload
     ${coreutils}/bin/cp -a --no-preserve=ownership "$payload"/. $out/payload/
 
-    cp ${writeText "snapcraft.yaml" manifestYaml} "$out/snap/snapcraft.yaml"
-    cp ${writeShellScript "build.sh" buildScript} "$out/build.sh"
+    cat > "$out/snap/snapcraft.yaml" <<'MANIFEST_EOF'
+    ${manifestYaml}
+    MANIFEST_EOF
+    cat > "$out/build.sh" <<'BUILD_SH_EOF'
+    ${buildScript}
+    BUILD_SH_EOF
     chmod +x "$out/build.sh"
 
     ${signing.emitSignScript {

@@ -15,7 +15,6 @@
   gawk,
   gnused,
   closureInfo,
-  writeText,
   ...
 }:
 
@@ -32,7 +31,6 @@ let
       gnused
       patchelf
       rsync
-      writeText
       ;
   };
   isWindows = target.os == "windows";

@@ -1,36 +1,19 @@
 {
-  callPackage,
   stdenv,
   lib,
   utils,
-  services,
   signing,
-  drv,
   format,
   meta,
   target,
+  componentPkg,
   coreutils,
   gnused,
   xar,
-  writeText,
   ...
 }:
 
 let
-  inner = callPackage ./pkg.nix {
-    inherit
-      utils
-      services
-      signing
-      drv
-      target
-      ;
-    format = "pkg";
-    meta = meta // {
-      format = "pkg";
-    };
-  };
-
   innerFile = "${meta.name}-${meta.version}-${utils.darwinArch target.arch}.pkg";
   outFile = "${meta.name}-${meta.version}-${utils.darwinArch target.arch}-install.pkg";
 
@@ -127,7 +110,7 @@ stdenv.mkDerivation {
       stageInner = ''
         work=$PWD/dist
         mkdir -p "$work/Resources"
-        cp ${inner}/${innerFile} "$work/${innerFile}"
+        cp ${componentPkg}/${innerFile} "$work/${innerFile}"
         chmod u+w "$work/${innerFile}"
 
         cd "$work"
@@ -137,7 +120,9 @@ stdenv.mkDerivation {
         ${copyResource "conclusion"}
         ${copyResource "background"}
 
-        cp ${writeText "Distribution" distributionXml} Distribution
+        cat > Distribution <<'DISTRIBUTION_EOF'
+        ${distributionXml}
+        DISTRIBUTION_EOF
         chmod u+w Distribution
         ${gnused}/bin/sed -i 's/^    //' Distribution
       '';
@@ -174,7 +159,11 @@ stdenv.mkDerivation {
 
   passthru = {
     info = meta;
-    inherit target format outFile;
-    componentPkg = inner;
+    inherit
+      target
+      format
+      outFile
+      componentPkg
+      ;
   };
 }

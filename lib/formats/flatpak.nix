@@ -20,8 +20,6 @@
   gawk,
   findutils,
   closureInfo,
-  writeText,
-  writeShellScript,
   ...
 }:
 
@@ -43,7 +41,6 @@ let
       gnused
       patchelf
       rsync
-      writeText
       ;
   };
   common = import ./_common-linux.nix {
@@ -52,7 +49,6 @@ let
       deps
       desktop
       services
-      writeText
       ;
   };
 
@@ -146,8 +142,12 @@ stdenv.mkDerivation {
     ( cd "$stage" && ${gnutar}/bin/tar --owner=0 --group=0 --sort=name \
         -czf "$out/${tarName}" . )
 
-    cp ${writeText "${appId}.yaml" manifestYaml} "$out/${appId}.yaml"
-    cp ${writeShellScript "build.sh" buildScript} "$out/build.sh"
+    cat > "$out/${appId}.yaml" <<'MANIFEST_EOF'
+    ${manifestYaml}
+    MANIFEST_EOF
+    cat > "$out/build.sh" <<'BUILD_SH_EOF'
+    ${buildScript}
+    BUILD_SH_EOF
     chmod +x "$out/build.sh"
 
     ${signing.emitSignScript {

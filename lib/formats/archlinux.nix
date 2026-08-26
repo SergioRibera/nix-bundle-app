@@ -22,7 +22,6 @@
   gawk,
   findutils,
   closureInfo,
-  writeText,
   ...
 }:
 
@@ -39,7 +38,6 @@ let
       gnused
       patchelf
       rsync
-      writeText
       ;
   };
   common = import ./_common-linux.nix {
@@ -48,7 +46,6 @@ let
       deps
       desktop
       services
-      writeText
       ;
   };
   pkgArch = meta.archArch;
@@ -152,7 +149,9 @@ let
     } > "$stage/.PKGINFO"
 
     ${lib.optionalString (common.needsPostScripts meta) ''
-      cp ${writeText "${meta.name}.install" installScript} "$stage/.INSTALL"
+      cat > "$stage/.INSTALL" <<'ARCH_INSTALL_EOF'
+      ${installScript}
+      ARCH_INSTALL_EOF
       ${gnused}/bin/sed -i 's/install = .*/&\ninstall = ${meta.name}.install/' "$stage/.PKGINFO" || true
     ''}
 
@@ -216,7 +215,9 @@ let
     ${gnused}/bin/sed -i 's/^    //' "$aurDir/PKGBUILD"
 
     ${lib.optionalString (common.needsPostScripts meta) ''
-      cp ${writeText "${aurPkgname}.install" installScript} "$aurDir/${aurPkgname}.install"
+      cat > "$aurDir/${aurPkgname}.install" <<'AUR_INSTALL_EOF'
+      ${installScript}
+      AUR_INSTALL_EOF
     ''}
 
     {

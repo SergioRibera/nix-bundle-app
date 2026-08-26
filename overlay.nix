@@ -110,19 +110,90 @@ let
         assert lib.assertMsg (osMatches allowedOS t.os)
           "nix-bundle-app: format '${format}' requires os='${allowedDesc}', got os='${t.os}'.";
         infoLib.normalize info drv t format;
+
+      # Formats that embed another format's derivation as a nested
+      # sub-bundle (dmg/pkg embed app.nix; productbuild embeds pkg.nix,
+      # which itself embeds app.nix; brew embeds tarball.nix). Each is
+      # built via its own single `callPackage` call right here — the only
+      # place with access to both `pkgs` and `formatModules` — using
+      # exactly the args the format module used to pass along when it
+      # built the sub-bundle itself. No module receives `callPackage`;
+      # each receives the finished derivation(s) as plain arguments.
+      mkAppBundle =
+        { format, meta }:
+        pkgs.callPackage formatModules.app {
+          inherit
+            utils
+            services
+            signing
+            drv
+            format
+            meta
+            ;
+          target = t;
+        };
+
+      mkPkgBundle =
+        { format, meta }:
+        pkgs.callPackage formatModules.pkg {
+          inherit
+            utils
+            services
+            signing
+            drv
+            format
+            meta
+            ;
+          target = t;
+          appBundle = mkAppBundle { inherit format meta; };
+        };
+
+      extraArgs =
+        if format == "dmg" || format == "pkg" then
+          { appBundle = mkAppBundle { inherit format meta; }; }
+        else if format == "productbuild" then
+          {
+            componentPkg = mkPkgBundle {
+              format = "pkg";
+              meta = meta // {
+                format = "pkg";
+              };
+            };
+          }
+        else if format == "brew" then
+          {
+            tarball = pkgs.callPackage formatModules."tar.gz" {
+              inherit
+                utils
+                desktop
+                services
+                drv
+                ;
+              target = t;
+              format = "tar.gz";
+              meta = meta // {
+                format = "tar.gz";
+              };
+            };
+          }
+        else
+          { };
     in
-    pkgs.callPackage mod {
-      inherit
-        utils
-        desktop
-        services
-        signing
-        drv
-        format
-        meta
-        ;
-      target = t;
-    };
+    pkgs.callPackage mod (
+      {
+        inherit
+          utils
+          desktop
+          services
+          signing
+          drv
+          format
+          meta
+          ;
+        target = t;
+      }
+      // extraArgs
+    );
 
   bundleAll =
     {

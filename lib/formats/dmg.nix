@@ -1,13 +1,11 @@
 {
-  callPackage,
   stdenv,
   utils,
-  services,
   signing,
-  drv,
   format,
   meta,
   target,
+  appBundle,
   coreutils,
   gnused,
   gnutar,
@@ -16,17 +14,6 @@
 }:
 
 let
-  appBundle = callPackage ./app.nix {
-    inherit
-      utils
-      services
-      signing
-      drv
-      format
-      meta
-      target
-      ;
-  };
   outFile = "${meta.name}-${meta.version}-${utils.darwinArch target.arch}.dmg";
 in
 stdenv.mkDerivation {

@@ -1,35 +1,16 @@
 {
-  callPackage,
   stdenv,
   lib,
-  utils,
-  desktop,
-  services,
-  drv,
   format,
   meta,
   target,
+  tarball,
   coreutils,
   gnused,
-  writeText,
   ...
 }:
 
 let
-  tarball = callPackage ./tarball.nix {
-    inherit
-      utils
-      desktop
-      services
-      drv
-      target
-      ;
-    format = "tar.gz";
-    meta = meta // {
-      format = "tar.gz";
-    };
-  };
-
   tarballFilename = "${meta.name}-${meta.version}-${target.arch}-${target.os}.tar.gz";
   className =
     let
@@ -114,18 +95,20 @@ stdenv.mkDerivation {
 
     sha=$(${coreutils}/bin/sha256sum "$out/${tarballFilename}" | ${coreutils}/bin/cut -d' ' -f1)
 
-    cp ${writeText "formula.rb" formula} "$out/${meta.name}.rb"
+    cat > "$out/${meta.name}.rb" <<'FORMULA_EOF'
+    ${formula}
+    FORMULA_EOF
     chmod u+w "$out/${meta.name}.rb"
     ${gnused}/bin/sed -i "s/PLACEHOLDER_SHA256_REPLACE_AFTER_UPLOAD/$sha/" "$out/${meta.name}.rb"
 
-    cp ${writeText "README-brew.txt" ''
-      Upload ${tarballFilename} to a public URL.
-      Edit ${meta.name}.rb and set the 'url' field to that URL.
-      Then publish ${meta.name}.rb in a tap repo, e.g. homebrew-tap.
+    cat > "$out/README-brew.txt" <<'README_EOF'
+    Upload ${tarballFilename} to a public URL.
+    Edit ${meta.name}.rb and set the 'url' field to that URL.
+    Then publish ${meta.name}.rb in a tap repo, e.g. homebrew-tap.
 
-      Install with:
-        brew install --formula ./${meta.name}.rb
-    ''} "$out/README-brew.txt"
+    Install with:
+      brew install --formula ./${meta.name}.rb
+    README_EOF
   '';
 
   passthru = {

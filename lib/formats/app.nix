@@ -16,7 +16,6 @@
   gnused,
   patchelf,
   closureInfo,
-  writeText,
   ...
 }:
 
@@ -33,7 +32,6 @@ let
       gnused
       patchelf
       rsync
-      writeText
       ;
   };
   appName = "${meta.name}.app";
@@ -109,10 +107,13 @@ stdenv.mkDerivation {
           # register them as system services you need a .pkg installer (which
           # copies them to /Library/LaunchDaemons) — see the `pkg` format.
           mkdir -p "$appdir/Contents/Resources/LaunchDaemons"
-          ${lib.concatMapStringsSep "\n" (p: ''
-            cp ${writeText p.filename p.content} \
-               "$appdir/Contents/Resources/LaunchDaemons/${p.filename}"
-          '') renderedServices}
+          ${lib.concatStrings (
+            lib.imap1 (i: p: ''
+              cat > "$appdir/Contents/Resources/LaunchDaemons/${p.filename}" <<'LAUNCHD_${toString i}_EOF'
+              ${p.content}
+              LAUNCHD_${toString i}_EOF
+            '') renderedServices
+          )}
         ''}
 
         ${signing.emitSignScript {

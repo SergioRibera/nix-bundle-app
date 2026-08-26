@@ -570,7 +570,6 @@ let
   release =
     {
       runCommand,
-      writeText,
       coreutils,
       findutils,
     }:
@@ -662,12 +661,18 @@ let
         ${cpLines}
 
         ${lib.optionalString installScripts ''
-          cp ${writeText "install.sh" installShText} $out/install.sh
+          cat > $out/install.sh <<'INSTALL_SH_EOF'
+          ${installShText}
+          INSTALL_SH_EOF
           chmod +x $out/install.sh
-          cp ${writeText "install.ps1" installPs1Text} $out/install.ps1
+          cat > $out/install.ps1 <<'INSTALL_PS1_EOF'
+          ${installPs1Text}
+          INSTALL_PS1_EOF
         ''}
 
-        cp ${writeText "INSTALL.md" installMdText} $out/INSTALL.md
+        cat > $out/INSTALL.md <<'INSTALL_MD_EOF'
+        ${installMdText}
+        INSTALL_MD_EOF
 
         ( cd $out && ${findutils}/bin/find . -type f ! -name SHA256SUMS -printf '%P\n' \
             | LC_ALL=C sort \
@@ -677,7 +682,6 @@ let
   installScripts =
     {
       runCommand,
-      writeText,
       coreutils,
       findutils,
     }:
@@ -686,7 +690,6 @@ let
       r = release {
         inherit
           runCommand
-          writeText
           coreutils
           findutils
           ;

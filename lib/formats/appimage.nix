@@ -18,8 +18,6 @@
   patchelf,
   gnused,
   closureInfo,
-  writeText,
-  writeShellScript,
   ...
 }:
 
@@ -36,7 +34,6 @@ let
       gnused
       patchelf
       rsync
-      writeText
       ;
   };
   outFile = "${meta.name}-${meta.version}-${target.arch}.AppImage";
@@ -129,8 +126,9 @@ stdenv.mkDerivation {
       setBundledRpath = true;
     }}
 
-    cp ${writeText renderedDesktop.filename renderedDesktop.content} \
-       "$AppDir/${meta.name}.desktop"
+    cat > "$AppDir/${meta.name}.desktop" <<'DESKTOP_EOF'
+    ${renderedDesktop.content}
+    DESKTOP_EOF
 
     ${lib.optionalString (renderedDesktop.iconPath != null) ''
       cp "${renderedDesktop.iconPath}" "$AppDir/${meta.name}.png" || true
@@ -142,7 +140,9 @@ stdenv.mkDerivation {
       ( cd "$AppDir" && ln -sf "${meta.name}.png" .DirIcon )
     fi
 
-    cp ${writeShellScript "AppRun" appRun} "$AppDir/AppRun"
+    cat > "$AppDir/AppRun" <<'APPRUN_EOF'
+    ${appRun}
+    APPRUN_EOF
     chmod +x "$AppDir/AppRun"
 
     mksquashfs "$AppDir" payload.squashfs \

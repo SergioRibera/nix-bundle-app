@@ -1,36 +1,23 @@
 {
-  callPackage,
   stdenv,
   lib,
   utils,
   services,
   signing,
-  drv,
   format,
   meta,
   target,
+  appBundle,
   coreutils,
   gnused,
   gzip,
   cpio,
   bomutils,
   xar,
-  writeText,
   ...
 }:
 
 let
-  appBundle = callPackage ./app.nix {
-    inherit
-      utils
-      services
-      signing
-      drv
-      format
-      meta
-      target
-      ;
-  };
   outFile = "${meta.name}-${meta.version}-${utils.darwinArch target.arch}.pkg";
 
   renderedServices = services.renderAllLaunchd meta.services;
@@ -100,11 +87,14 @@ stdenv.mkDerivation {
             ''
               mkdir -p "$root/Applications" "$root/Library/LaunchDaemons"
               cp -r ${appBundle}/${meta.name}.app "$root/Applications/"
-              ${lib.concatMapStringsSep "\n" (p: ''
-                cp ${writeText p.filename p.content} \
-                   "$root/Library/LaunchDaemons/${p.filename}"
-                chmod 644 "$root/Library/LaunchDaemons/${p.filename}"
-              '') renderedServices}
+              ${lib.concatStrings (
+                lib.imap1 (i: p: ''
+                  cat > "$root/Library/LaunchDaemons/${p.filename}" <<'LAUNCHD_${toString i}_EOF'
+                  ${p.content}
+                  LAUNCHD_${toString i}_EOF
+                  chmod 644 "$root/Library/LaunchDaemons/${p.filename}"
+                '') renderedServices
+              )}
             ''
           else
             ''
@@ -129,7 +119,9 @@ stdenv.mkDerivation {
         nfiles=$( find "$root" | wc -l )
         instkb=$( du -sk "$root" | cut -f1 )
 
-        cp ${writeText "PackageInfo" pkgInfoXML} "$flat/PackageInfo.tpl"
+        cat > "$flat/PackageInfo.tpl" <<'PKGINFO_EOF'
+        ${pkgInfoXML}
+        PKGINFO_EOF
         ${gnused}/bin/sed -i 's/^    //' "$flat/PackageInfo.tpl"
         ${gnused}/bin/sed \
           -e "s/@INSTKB@/$instkb/" \
@@ -139,7 +131,9 @@ stdenv.mkDerivation {
 
         ${lib.optionalString hasServices ''
           mkdir -p "$work/scripts"
-          cp ${writeText "postinstall" postinstallText} "$work/scripts/postinstall"
+          cat > "$work/scripts/postinstall" <<'POSTINSTALL_EOF'
+          ${postinstallText}
+          POSTINSTALL_EOF
           chmod 755 "$work/scripts/postinstall"
           ( cd "$work/scripts" && find . -print | cpio -o --format=odc 2>/dev/null ) \
             | gzip -9 > "$flat/Scripts"
@@ -155,7 +149,9 @@ stdenv.mkDerivation {
         mkdir -p $out
         ${lib.optionalString hasServices ''
           mkdir -p scripts
-          cp ${writeText "postinstall" postinstallText} scripts/postinstall
+          cat > scripts/postinstall <<'PKGBUILD_POSTINSTALL_EOF'
+          ${postinstallText}
+          PKGBUILD_POSTINSTALL_EOF
           chmod 755 scripts/postinstall
         ''}
         pkgbuild \

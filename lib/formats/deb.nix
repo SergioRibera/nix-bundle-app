@@ -20,7 +20,6 @@
   gnused,
   findutils,
   closureInfo,
-  writeText,
   ...
 }:
 
@@ -37,7 +36,6 @@ let
       gnused
       patchelf
       rsync
-      writeText
       ;
   };
   common = import ./_common-linux.nix {
@@ -46,7 +44,6 @@ let
       deps
       desktop
       services
-      writeText
       ;
   };
   depList = meta.depends.deb or [ ];
@@ -122,24 +119,24 @@ stdenv.mkDerivation {
     chmod 644 "$stage/DEBIAN/control"
 
     ${lib.optionalString (common.needsPostScripts meta) ''
-      cp ${writeText "postinst" ''
-        #!/bin/sh
-        set -e
-        ${common.postinstSnippet meta}
-        exit 0
-      ''} "$stage/DEBIAN/postinst"
-      cp ${writeText "prerm" ''
-        #!/bin/sh
-        set -e
-        ${common.prermSnippet meta}
-        exit 0
-      ''} "$stage/DEBIAN/prerm"
-      cp ${writeText "postrm" ''
-        #!/bin/sh
-        set -e
-        ${common.postrmSnippet meta}
-        exit 0
-      ''} "$stage/DEBIAN/postrm"
+      cat > "$stage/DEBIAN/postinst" <<'DEB_POSTINST_EOF'
+      #!/bin/sh
+      set -e
+      ${common.postinstSnippet meta}
+      exit 0
+      DEB_POSTINST_EOF
+      cat > "$stage/DEBIAN/prerm" <<'DEB_PRERM_EOF'
+      #!/bin/sh
+      set -e
+      ${common.prermSnippet meta}
+      exit 0
+      DEB_PRERM_EOF
+      cat > "$stage/DEBIAN/postrm" <<'DEB_POSTRM_EOF'
+      #!/bin/sh
+      set -e
+      ${common.postrmSnippet meta}
+      exit 0
+      DEB_POSTRM_EOF
       chmod 755 "$stage/DEBIAN/postinst" "$stage/DEBIAN/prerm" "$stage/DEBIAN/postrm"
     ''}
 

@@ -17,7 +17,6 @@
   gawk,
   patchelf,
   closureInfo,
-  writeText,
   ...
 }:
 
@@ -34,7 +33,6 @@ let
       gnused
       patchelf
       rsync
-      writeText
       ;
   };
   installDirName = meta.installDirName;
@@ -126,8 +124,12 @@ stdenv.mkDerivation {
         chmod -R u+w payload
 
         ${lib.optionalString hasServices ''
-          cp ${writeText "install-services.bat" installBat}   payload/install-services.bat
-          cp ${writeText "uninstall-services.bat" uninstallBat} payload/uninstall-services.bat
+          cat > payload/install-services.bat <<'INSTALL_SERVICES_EOF'
+          ${installBat}
+          INSTALL_SERVICES_EOF
+          cat > payload/uninstall-services.bat <<'UNINSTALL_SERVICES_EOF'
+          ${uninstallBat}
+          UNINSTALL_SERVICES_EOF
         ''}
 
         cat > installer.nsi <<'NSIEOF'

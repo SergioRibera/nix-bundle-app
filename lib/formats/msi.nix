@@ -18,7 +18,6 @@
   gnugrep,
   patchelf,
   closureInfo,
-  writeText,
   ...
 }:
 
@@ -35,7 +34,6 @@ let
       gnused
       patchelf
       rsync
-      writeText
       ;
   };
   winArch = if target.arch == "x86_64" then "x64" else target.arch;
@@ -110,9 +108,13 @@ let
     </Wix>
   '';
 
-  writeServiceXmlFiles = lib.concatMapStringsSep "\n" (bn: ''
-    cp ${writeText "msi-svc-${bn}.xml" svcXmlByBin.${bn}} "$svcdir/${bn}.xml"
-  '') svcBinNames;
+  writeServiceXmlFiles = lib.concatStrings (
+    lib.imap1 (i: bn: ''
+      cat > "$svcdir/${bn}.xml" <<'SVCXML_${toString i}_EOF'
+      ${svcXmlByBin.${bn}}
+      SVCXML_${toString i}_EOF
+    '') svcBinNames
+  );
 
   injectScript = ''
     awk -v inj_dir="$svcdir" -v binnames="${lib.concatStringsSep " " svcBinNames}" '
@@ -166,7 +168,9 @@ stdenv.mkDerivation {
     fi
     chmod -R u+w payload
 
-    cp ${writeText "installer.wxs" wxs} installer.wxs
+    cat > installer.wxs <<'WXS_EOF'
+    ${wxs}
+    WXS_EOF
     ${gnused}/bin/sed -i 's/^    //' installer.wxs
 
     find payload -type f \
