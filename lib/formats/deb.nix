@@ -1,7 +1,6 @@
 {
-  pkgs,
+  stdenv,
   lib,
-  deps,
   utils,
   desktop,
   services,
@@ -10,17 +9,44 @@
   format,
   meta,
   target,
+  dpkg,
+  fakeroot,
+  patchelf,
+  file,
+  gnugrep,
+  rsync,
+  coreutils,
+  gawk,
+  gnused,
+  findutils,
+  closureInfo,
+  writeText,
+  ...
 }:
 
 let
+  deps = import ../deps.nix {
+    inherit
+      lib
+      utils
+      closureInfo
+      coreutils
+      file
+      gawk
+      gnugrep
+      gnused
+      patchelf
+      rsync
+      writeText
+      ;
+  };
   common = import ./_common-linux.nix {
     inherit
-      pkgs
       lib
       deps
-      utils
       desktop
       services
+      writeText
       ;
   };
   depList = meta.depends.deb or [ ];
@@ -33,10 +59,10 @@ let
   # so cross-distro layouts stay aligned.
   pkgName = utils.debName meta.name;
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = "${pkgName}-${meta.version}-${meta.debArch}.deb";
   dontUnpack = true;
-  nativeBuildInputs = with pkgs; [
+  nativeBuildInputs = [
     dpkg
     fakeroot
     patchelf
@@ -96,19 +122,19 @@ pkgs.stdenv.mkDerivation {
     chmod 644 "$stage/DEBIAN/control"
 
     ${lib.optionalString (common.needsPostScripts meta) ''
-      cp ${pkgs.writeText "postinst" ''
+      cp ${writeText "postinst" ''
         #!/bin/sh
         set -e
         ${common.postinstSnippet meta}
         exit 0
       ''} "$stage/DEBIAN/postinst"
-      cp ${pkgs.writeText "prerm" ''
+      cp ${writeText "prerm" ''
         #!/bin/sh
         set -e
         ${common.prermSnippet meta}
         exit 0
       ''} "$stage/DEBIAN/prerm"
-      cp ${pkgs.writeText "postrm" ''
+      cp ${writeText "postrm" ''
         #!/bin/sh
         set -e
         ${common.postrmSnippet meta}

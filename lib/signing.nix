@@ -1,4 +1,4 @@
-{ pkgs, lib }:
+{ lib }:
 
 # Codesigning helpers. Bundles ship unsigned out of the Nix sandbox (secrets
 # can't safely live in /nix/store). When `info.signing.<os>.enable = true`,
@@ -244,14 +244,23 @@ let
   # `nix-build -A <name> && GPG_KEY_ID=… ./result/bin/<name> -- ./dist`
   # produces a signed bundle without touching `result/sign.sh` manually. The
   # underlying `bundle` derivation stays pure + cacheable.
+  #
+  # Curried on its own tool deps (rather than this whole file taking `pkgs`)
+  # so callers dispatch it with a single `callPackage signing.signedApp {}` —
+  # one callPackage call per derivation, right where it's actually built.
   signedApp =
+    {
+      writeShellApplication,
+      coreutils,
+      bash,
+    }:
     {
       bundle,
       name ? "${baseNameOf bundle.name}-sign",
     }:
-    pkgs.writeShellApplication {
+    writeShellApplication {
       inherit name;
-      runtimeInputs = with pkgs; [
+      runtimeInputs = [
         coreutils
         bash
       ];

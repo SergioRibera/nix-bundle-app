@@ -1,25 +1,24 @@
 {
-  pkgs,
-  lib,
-  deps,
+  callPackage,
+  stdenv,
   utils,
-  desktop,
   services,
   signing,
   drv,
   format,
   meta,
   target,
+  coreutils,
+  gnused,
+  gnutar,
+  xorriso,
+  ...
 }:
 
 let
-  appBundle = import ./app.nix {
+  appBundle = callPackage ./app.nix {
     inherit
-      pkgs
-      lib
-      deps
       utils
-      desktop
       services
       signing
       drv
@@ -30,13 +29,13 @@ let
   };
   outFile = "${meta.name}-${meta.version}-${utils.darwinArch target.arch}.dmg";
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = outFile;
   dontUnpack = true;
   nativeBuildInputs = [
-    pkgs.coreutils
-    pkgs.gnused
-    pkgs.xorriso
+    coreutils
+    gnused
+    xorriso
   ];
 
   buildCommand =
@@ -63,7 +62,7 @@ pkgs.stdenv.mkDerivation {
           -appid "${meta.bundleId}" \
           -o "$out/${outFile}" \
           "$stage" 2>/dev/null \
-        || ${pkgs.gnutar}/bin/tar -czf "$out/${outFile}" -C "$stage" .
+        || ${gnutar}/bin/tar -czf "$out/${outFile}" -C "$stage" .
       '';
     in
     ''

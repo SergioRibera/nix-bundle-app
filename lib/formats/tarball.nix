@@ -1,7 +1,6 @@
 {
-  pkgs,
+  stdenv,
   lib,
-  deps,
   utils,
   desktop,
   services,
@@ -9,6 +8,19 @@
   format,
   meta,
   target,
+  gnutar,
+  gzip,
+  xz,
+  zstd,
+  patchelf,
+  file,
+  gnugrep,
+  gawk,
+  gnused,
+  rsync,
+  coreutils,
+  closureInfo,
+  writeText,
   ...
 }:
 
@@ -17,25 +29,39 @@ let
   isDarwin = target.os == "darwin";
   isWindows = target.os == "windows";
 
+  deps = import ../deps.nix {
+    inherit
+      lib
+      utils
+      closureInfo
+      coreutils
+      file
+      gawk
+      gnugrep
+      gnused
+      patchelf
+      rsync
+      writeText
+      ;
+  };
   common = import ./_common-linux.nix {
     inherit
-      pkgs
       lib
       deps
-      utils
       desktop
       services
+      writeText
       ;
   };
 
   ext = format;
   compressor =
     {
-      "tar.gz" = "${pkgs.gzip}/bin/gzip -n -9";
-      "tar.xz" = "${pkgs.xz}/bin/xz -9 -T0";
-      "tar.zst" = "${pkgs.zstd}/bin/zstd -19 -T0";
+      "tar.gz" = "${gzip}/bin/gzip -n -9";
+      "tar.xz" = "${xz}/bin/xz -9 -T0";
+      "tar.zst" = "${zstd}/bin/zstd -19 -T0";
     }
-    .${ext} or "${pkgs.gzip}/bin/gzip -n -9";
+    .${ext} or "${gzip}/bin/gzip -n -9";
 
   outFile = "${meta.name}-${meta.version}-${target.arch}-${target.os}.${ext}";
 
@@ -66,7 +92,7 @@ let
     ${deps.copyBinaries drv "$stage"}
     ${deps.copyWindowsDlls drv "$stage"}
     if [ -d "${drv}/share" ]; then
-      ${pkgs.rsync}/bin/rsync -a --copy-links "${drv}/share/" "$stage/share/" || true
+      ${rsync}/bin/rsync -a --copy-links "${drv}/share/" "$stage/share/" || true
     fi
     ${deps.verifyStagedBinaries {
       binDir = "$stage";
@@ -87,10 +113,10 @@ let
   rootDir = "${meta.name}-${meta.version}";
 
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = "${meta.name}-${meta.version}-${target.arch}-${target.os}.${ext}";
   dontUnpack = true;
-  nativeBuildInputs = with pkgs; [
+  nativeBuildInputs = [
     gnutar
     gzip
     xz
@@ -105,7 +131,7 @@ pkgs.stdenv.mkDerivation {
   buildCommand = ''
     ${prep}
     mkdir -p $out
-    ( cd "$PWD" && ${pkgs.gnutar}/bin/tar --owner=0 --group=0 --sort=name -cf - "${rootDir}" \
+    ( cd "$PWD" && ${gnutar}/bin/tar --owner=0 --group=0 --sort=name -cf - "${rootDir}" \
       | ${compressor} > "$out/${outFile}" )
   '';
 

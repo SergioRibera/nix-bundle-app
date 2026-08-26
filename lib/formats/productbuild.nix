@@ -1,25 +1,25 @@
 {
-  pkgs,
+  callPackage,
+  stdenv,
   lib,
-  deps,
   utils,
-  desktop,
   services,
   signing,
   drv,
   format,
   meta,
   target,
+  coreutils,
+  gnused,
+  xar,
+  writeText,
+  ...
 }:
 
 let
-  inner = import ./pkg.nix {
+  inner = callPackage ./pkg.nix {
     inherit
-      pkgs
-      lib
-      deps
       utils
-      desktop
       services
       signing
       drv
@@ -113,13 +113,13 @@ let
       cp "${path}" "Resources/${filenameFor key path}"
     '';
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = outFile;
   dontUnpack = true;
   nativeBuildInputs = [
-    pkgs.coreutils
-    pkgs.gnused
-    pkgs.xar
+    coreutils
+    gnused
+    xar
   ];
 
   buildCommand =
@@ -137,9 +137,9 @@ pkgs.stdenv.mkDerivation {
         ${copyResource "conclusion"}
         ${copyResource "background"}
 
-        cp ${pkgs.writeText "Distribution" distributionXml} Distribution
+        cp ${writeText "Distribution" distributionXml} Distribution
         chmod u+w Distribution
-        ${pkgs.gnused}/bin/sed -i 's/^    //' Distribution
+        ${gnused}/bin/sed -i 's/^    //' Distribution
       '';
 
       # Distribution xml + Resources/ + component pkg side by side is what

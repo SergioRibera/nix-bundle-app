@@ -1,17 +1,42 @@
 {
-  pkgs,
+  stdenv,
   lib,
-  deps,
+  utils,
   services,
   signing,
   drv,
   format,
   meta,
   target,
+  nsis,
+  coreutils,
+  gnused,
+  rsync,
+  file,
+  gnugrep,
+  gawk,
+  patchelf,
+  closureInfo,
+  writeText,
   ...
 }:
 
 let
+  deps = import ../deps.nix {
+    inherit
+      lib
+      utils
+      closureInfo
+      coreutils
+      file
+      gawk
+      gnugrep
+      gnused
+      patchelf
+      rsync
+      writeText
+      ;
+  };
   installDirName = meta.installDirName;
   winArch = if target.arch == "x86_64" then "x64" else target.arch;
   outFile = "${meta.name}-${meta.version}-${winArch}-setup.exe";
@@ -81,14 +106,14 @@ let
     SectionEnd
   '';
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = outFile;
   dontUnpack = true;
   nativeBuildInputs = [
-    pkgs.nsis
-    pkgs.coreutils
-    pkgs.gnused
-    pkgs.rsync
+    nsis
+    coreutils
+    gnused
+    rsync
   ];
 
   buildCommand = ''
@@ -96,19 +121,19 @@ pkgs.stdenv.mkDerivation {
         ${deps.copyBinaries drv "payload"}
         ${deps.copyWindowsDlls drv "payload"}
         if [ -d "${drv}/share" ]; then
-          ${pkgs.rsync}/bin/rsync -a --copy-links "${drv}/share/" "payload/share/" || true
+          ${rsync}/bin/rsync -a --copy-links "${drv}/share/" "payload/share/" || true
         fi
         chmod -R u+w payload
 
         ${lib.optionalString hasServices ''
-          cp ${pkgs.writeText "install-services.bat" installBat}   payload/install-services.bat
-          cp ${pkgs.writeText "uninstall-services.bat" uninstallBat} payload/uninstall-services.bat
+          cp ${writeText "install-services.bat" installBat}   payload/install-services.bat
+          cp ${writeText "uninstall-services.bat" uninstallBat} payload/uninstall-services.bat
         ''}
 
         cat > installer.nsi <<'NSIEOF'
     ${nsi}
     NSIEOF
-        ${pkgs.gnused}/bin/sed -i 's/^    //' installer.nsi
+        ${gnused}/bin/sed -i 's/^    //' installer.nsi
 
         makensis -V2 -INPUTCHARSET UTF8 installer.nsi
 

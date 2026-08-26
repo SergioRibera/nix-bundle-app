@@ -1,9 +1,9 @@
 {
-  pkgs,
   lib,
   deps,
   desktop,
   services,
+  writeText,
   ...
 }:
 
@@ -18,7 +18,7 @@ let
     lib.optionalString (rendered != [ ]) ''
       mkdir -p "${destDir}"
       ${lib.concatMapStringsSep "\n" (u: ''
-        cp ${pkgs.writeText u.filename u.content} "${destDir}/${u.filename}"
+        cp ${writeText u.filename u.content} "${destDir}/${u.filename}"
         chmod 644 "${destDir}/${u.filename}"
       '') rendered}
     '';
@@ -28,7 +28,7 @@ let
     lib.optionalString (meta.desktopEntries != [ ]) ''
       mkdir -p "${stage}/usr/share/applications"
       ${lib.concatMapStringsSep "\n" (e: ''
-        cp ${pkgs.writeText e.filename e.content} \
+        cp ${writeText e.filename e.content} \
            "${stage}/usr/share/applications/${e.filename}"
         chmod 644 "${stage}/usr/share/applications/${e.filename}"
         ${lib.optionalString (e.iconPath != null) ''
@@ -43,7 +43,7 @@ let
 
   # Materialise meta.extraFiles into the staged tree. Each entry is
   # `<absolute dest path> = <Nix path | inline string>`. Inline strings
-  # become a `pkgs.writeText` whose basename mirrors the destination's
+  # become a `writeText` whose basename mirrors the destination's
   # so debug listings (`dpkg -c`, `rpm -qlp`) stay readable.
   writeExtraFiles =
     meta: stage:
@@ -56,9 +56,9 @@ let
           # (Nix path, store path, derivation) coerces via the
           # interpolation below. Distinguishing on `isString`
           # (rather than `isPath`) keeps derivation-typed values
-          # like `pkgs.writeText ...` out of the writeText path,
+          # like `writeText ...` out of the writeText path,
           # which would otherwise emit a deprecation warning.
-          srcFile = if builtins.isString src then pkgs.writeText (baseNameOf dest) src else src;
+          srcFile = if builtins.isString src then writeText (baseNameOf dest) src else src;
         in
         # `${srcFile}` (no `toString`) is what forces Nix to copy a
         # raw filesystem path into the store AND register it as a

@@ -11,9 +11,17 @@ let
   desktop = import ./lib/desktop.nix { inherit lib; };
   services = import ./lib/services.nix { inherit lib utils; };
   infoLib = import ./lib/info.nix { inherit lib utils; };
-  deps = import ./lib/deps.nix { inherit pkgs lib utils; };
-  signing = import ./lib/signing.nix { inherit pkgs lib; };
-  releaseLib = import ./lib/release.nix { inherit pkgs lib; };
+  # None of these return a derivation — they're pure string/attrset-rendering
+  # libraries — so they're `import`ed, not `callPackage`d. `deps.nix` needs
+  # tool derivations of its own (to embed absolute store paths in the shell
+  # it generates), but it's reused by many different format derivations, so
+  # rather than resolve those once here and hand every format the same fixed
+  # splice, each format module `import`s `deps.nix` itself using the tool
+  # args *it* received from its own `callPackage` call below. That keeps
+  # exactly one `callPackage` call per derivation, with that call the sole
+  # authority over how its tools are spliced.
+  signing = import ./lib/signing.nix { inherit lib; };
+  releaseLib = import ./lib/release.nix { inherit lib; };
 
   formatModules = {
     deb = import ./lib/formats/deb.nix;
@@ -103,11 +111,8 @@ let
           "nix-bundle-app: format '${format}' requires os='${allowedDesc}', got os='${t.os}'.";
         infoLib.normalize info drv t format;
     in
-    mod {
+    pkgs.callPackage mod {
       inherit
-        pkgs
-        lib
-        deps
         utils
         desktop
         services
@@ -140,9 +145,12 @@ in
 {
   nixBundleApp = {
     inherit bundle bundleAll;
-    inherit (signing) signedApp;
-    release = releaseLib.release bundle;
-    installScripts = releaseLib.installScripts bundle;
+    # Each is curried on its own tool deps first — `callPackage` resolves
+    # those (one call, right here, per exposed derivation-producing entry
+    # point), then we apply `bundle` to get the function callers expect.
+    signedApp = pkgs.callPackage signing.signedApp { };
+    release = pkgs.callPackage releaseLib.release { } bundle;
+    installScripts = pkgs.callPackage releaseLib.installScripts { } bundle;
     formats = builtins.attrNames formatModules;
     inherit formatOS;
     targets = targetsByOS;

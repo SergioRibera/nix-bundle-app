@@ -1,17 +1,44 @@
 {
-  pkgs,
   lib,
-  deps,
+  utils,
   desktop,
   signing,
   drv,
   format,
   meta,
   target,
+  stdenv,
+  fetchurl,
+  squashfsTools,
+  coreutils,
+  file,
+  gnugrep,
+  gawk,
+  rsync,
+  patchelf,
+  gnused,
+  closureInfo,
+  writeText,
+  writeShellScript,
   ...
 }:
 
 let
+  deps = import ../deps.nix {
+    inherit
+      lib
+      utils
+      closureInfo
+      coreutils
+      file
+      gawk
+      gnugrep
+      gnused
+      patchelf
+      rsync
+      writeText
+      ;
+  };
   outFile = "${meta.name}-${meta.version}-${target.arch}.AppImage";
 
   # Pinned to a numbered type2-runtime release, not `continuous` — that tag
@@ -33,7 +60,7 @@ let
     if sha == null then
       throw "nix-bundle-app: no pinned AppImage runtime hash for arch '${target.arch}'. Supply meta.appImageRuntime."
     else
-      pkgs.fetchurl {
+      fetchurl {
         inherit url;
         sha256 = sha;
       };
@@ -67,10 +94,10 @@ let
     exec "$HERE/usr/bin/${meta.name}" "$@"
   '';
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = outFile;
   dontUnpack = true;
-  nativeBuildInputs = with pkgs; [
+  nativeBuildInputs = [
     squashfsTools
     coreutils
     file
@@ -102,7 +129,7 @@ pkgs.stdenv.mkDerivation {
       setBundledRpath = true;
     }}
 
-    cp ${pkgs.writeText renderedDesktop.filename renderedDesktop.content} \
+    cp ${writeText renderedDesktop.filename renderedDesktop.content} \
        "$AppDir/${meta.name}.desktop"
 
     ${lib.optionalString (renderedDesktop.iconPath != null) ''
@@ -111,11 +138,11 @@ pkgs.stdenv.mkDerivation {
     ''}
     if [ ! -e "$AppDir/${meta.name}.png" ]; then
       # 1x1 transparent PNG so appimagetool spec is satisfied
-      ${pkgs.coreutils}/bin/printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xfc\xff\xff?\x00\x05\xfe\x02\xfe\xa3\x3e\x8a\xcc\x00\x00\x00\x00IEND\xaeB`\x82' > "$AppDir/${meta.name}.png"
+      ${coreutils}/bin/printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xfc\xff\xff?\x00\x05\xfe\x02\xfe\xa3\x3e\x8a\xcc\x00\x00\x00\x00IEND\xaeB`\x82' > "$AppDir/${meta.name}.png"
       ( cd "$AppDir" && ln -sf "${meta.name}.png" .DirIcon )
     fi
 
-    cp ${pkgs.writeShellScript "AppRun" appRun} "$AppDir/AppRun"
+    cp ${writeShellScript "AppRun" appRun} "$AppDir/AppRun"
     chmod +x "$AppDir/AppRun"
 
     mksquashfs "$AppDir" payload.squashfs \

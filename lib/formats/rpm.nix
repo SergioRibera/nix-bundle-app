@@ -1,7 +1,6 @@
 {
-  pkgs,
+  stdenv,
   lib,
-  deps,
   utils,
   desktop,
   services,
@@ -10,17 +9,43 @@
   format,
   meta,
   target,
+  rpm,
+  patchelf,
+  file,
+  gnugrep,
+  rsync,
+  coreutils,
+  gnused,
+  gawk,
+  findutils,
+  closureInfo,
+  writeText,
+  ...
 }:
 
 let
+  deps = import ../deps.nix {
+    inherit
+      lib
+      utils
+      closureInfo
+      coreutils
+      file
+      gawk
+      gnugrep
+      gnused
+      patchelf
+      rsync
+      writeText
+      ;
+  };
   common = import ./_common-linux.nix {
     inherit
-      pkgs
       lib
       deps
-      utils
       desktop
       services
+      writeText
       ;
   };
   reqs = meta.depends.rpm or [ ];
@@ -30,10 +55,10 @@ let
   hasEntries = meta.desktopEntries != [ ];
   hasIcons = lib.any (e: e.iconPath != null) meta.desktopEntries;
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = "${meta.name}-${meta.version}-1.${meta.rpmArch}.rpm";
   dontUnpack = true;
-  nativeBuildInputs = with pkgs; [
+  nativeBuildInputs = [
     rpm
     patchelf
     file

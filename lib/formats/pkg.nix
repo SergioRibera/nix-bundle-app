@@ -1,25 +1,28 @@
 {
-  pkgs,
+  callPackage,
+  stdenv,
   lib,
-  deps,
   utils,
-  desktop,
   services,
   signing,
   drv,
   format,
   meta,
   target,
+  coreutils,
+  gnused,
+  gzip,
+  cpio,
+  bomutils,
+  xar,
+  writeText,
+  ...
 }:
 
 let
-  appBundle = import ./app.nix {
+  appBundle = callPackage ./app.nix {
     inherit
-      pkgs
-      lib
-      deps
       utils
-      desktop
       services
       signing
       drv
@@ -72,18 +75,18 @@ let
     exit 0
   '';
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = outFile;
   dontUnpack = true;
   nativeBuildInputs = [
-    pkgs.coreutils
-    pkgs.gnused
-    pkgs.gzip
-    pkgs.cpio
+    coreutils
+    gnused
+    gzip
+    cpio
     # For the manual flat-pkg fallback below (`pkgbuild` is never on the
     # sandboxed build PATH, even on darwin).
-    pkgs.bomutils
-    pkgs.xar
+    bomutils
+    xar
   ];
 
   buildCommand =
@@ -98,7 +101,7 @@ pkgs.stdenv.mkDerivation {
               mkdir -p "$root/Applications" "$root/Library/LaunchDaemons"
               cp -r ${appBundle}/${meta.name}.app "$root/Applications/"
               ${lib.concatMapStringsSep "\n" (p: ''
-                cp ${pkgs.writeText p.filename p.content} \
+                cp ${writeText p.filename p.content} \
                    "$root/Library/LaunchDaemons/${p.filename}"
                 chmod 644 "$root/Library/LaunchDaemons/${p.filename}"
               '') renderedServices}
@@ -126,9 +129,9 @@ pkgs.stdenv.mkDerivation {
         nfiles=$( find "$root" | wc -l )
         instkb=$( du -sk "$root" | cut -f1 )
 
-        cp ${pkgs.writeText "PackageInfo" pkgInfoXML} "$flat/PackageInfo.tpl"
-        ${pkgs.gnused}/bin/sed -i 's/^    //' "$flat/PackageInfo.tpl"
-        ${pkgs.gnused}/bin/sed \
+        cp ${writeText "PackageInfo" pkgInfoXML} "$flat/PackageInfo.tpl"
+        ${gnused}/bin/sed -i 's/^    //' "$flat/PackageInfo.tpl"
+        ${gnused}/bin/sed \
           -e "s/@INSTKB@/$instkb/" \
           -e "s/@NFILES@/$nfiles/" \
           "$flat/PackageInfo.tpl" > "$flat/PackageInfo"
@@ -136,7 +139,7 @@ pkgs.stdenv.mkDerivation {
 
         ${lib.optionalString hasServices ''
           mkdir -p "$work/scripts"
-          cp ${pkgs.writeText "postinstall" postinstallText} "$work/scripts/postinstall"
+          cp ${writeText "postinstall" postinstallText} "$work/scripts/postinstall"
           chmod 755 "$work/scripts/postinstall"
           ( cd "$work/scripts" && find . -print | cpio -o --format=odc 2>/dev/null ) \
             | gzip -9 > "$flat/Scripts"
@@ -152,7 +155,7 @@ pkgs.stdenv.mkDerivation {
         mkdir -p $out
         ${lib.optionalString hasServices ''
           mkdir -p scripts
-          cp ${pkgs.writeText "postinstall" postinstallText} scripts/postinstall
+          cp ${writeText "postinstall" postinstallText} scripts/postinstall
           chmod 755 scripts/postinstall
         ''}
         pkgbuild \

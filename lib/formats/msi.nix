@@ -1,7 +1,6 @@
 {
-  pkgs,
+  stdenv,
   lib,
-  deps,
   utils,
   services,
   signing,
@@ -9,10 +8,36 @@
   format,
   meta,
   target,
+  msitools,
+  coreutils,
+  gnused,
+  gawk,
+  rsync,
+  findutils,
+  file,
+  gnugrep,
+  patchelf,
+  closureInfo,
+  writeText,
   ...
 }:
 
 let
+  deps = import ../deps.nix {
+    inherit
+      lib
+      utils
+      closureInfo
+      coreutils
+      file
+      gawk
+      gnugrep
+      gnused
+      patchelf
+      rsync
+      writeText
+      ;
+  };
   winArch = if target.arch == "x86_64" then "x64" else target.arch;
   outFile = "${meta.name}-${meta.version}-${winArch}.msi";
 
@@ -86,7 +111,7 @@ let
   '';
 
   writeServiceXmlFiles = lib.concatMapStringsSep "\n" (bn: ''
-    cp ${pkgs.writeText "msi-svc-${bn}.xml" svcXmlByBin.${bn}} "$svcdir/${bn}.xml"
+    cp ${writeText "msi-svc-${bn}.xml" svcXmlByBin.${bn}} "$svcdir/${bn}.xml"
   '') svcBinNames;
 
   injectScript = ''
@@ -120,10 +145,10 @@ let
     mv components.wxs.new components.wxs
   '';
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = outFile;
   dontUnpack = true;
-  nativeBuildInputs = with pkgs; [
+  nativeBuildInputs = [
     msitools
     coreutils
     gnused
@@ -137,12 +162,12 @@ pkgs.stdenv.mkDerivation {
     ${deps.copyBinaries drv "payload"}
     ${deps.copyWindowsDlls drv "payload"}
     if [ -d "${drv}/share" ]; then
-      ${pkgs.rsync}/bin/rsync -a --copy-links "${drv}/share/" "payload/share/" || true
+      ${rsync}/bin/rsync -a --copy-links "${drv}/share/" "payload/share/" || true
     fi
     chmod -R u+w payload
 
-    cp ${pkgs.writeText "installer.wxs" wxs} installer.wxs
-    ${pkgs.gnused}/bin/sed -i 's/^    //' installer.wxs
+    cp ${writeText "installer.wxs" wxs} installer.wxs
+    ${gnused}/bin/sed -i 's/^    //' installer.wxs
 
     find payload -type f \
       | wixl-heat \

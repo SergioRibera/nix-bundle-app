@@ -1,17 +1,41 @@
 {
-  pkgs,
+  stdenv,
   lib,
-  deps,
+  utils,
   services,
   signing,
   drv,
   format,
   meta,
   target,
+  file,
+  gnugrep,
+  gawk,
+  rsync,
+  coreutils,
+  gnused,
+  patchelf,
+  closureInfo,
+  writeText,
   ...
 }:
 
 let
+  deps = import ../deps.nix {
+    inherit
+      lib
+      utils
+      closureInfo
+      coreutils
+      file
+      gawk
+      gnugrep
+      gnused
+      patchelf
+      rsync
+      writeText
+      ;
+  };
   appName = "${meta.name}.app";
   execName = meta.name;
   renderedServices = services.renderAllLaunchd meta.services;
@@ -40,10 +64,10 @@ let
     </plist>
   '';
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = "${meta.name}-${meta.version}.app";
   dontUnpack = true;
-  nativeBuildInputs = with pkgs; [
+  nativeBuildInputs = [
     file
     gnugrep
     rsync
@@ -74,7 +98,7 @@ pkgs.stdenv.mkDerivation {
         cat > "$appdir/Contents/Info.plist" <<'EOF'
     ${plist}
     EOF
-        ${pkgs.gnused}/bin/sed -i 's/^    //' "$appdir/Contents/Info.plist"
+        ${gnused}/bin/sed -i 's/^    //' "$appdir/Contents/Info.plist"
 
         cat > "$appdir/Contents/PkgInfo" <<EOF
     APPL${meta.bundleSignature}
@@ -86,7 +110,7 @@ pkgs.stdenv.mkDerivation {
           # copies them to /Library/LaunchDaemons) — see the `pkg` format.
           mkdir -p "$appdir/Contents/Resources/LaunchDaemons"
           ${lib.concatMapStringsSep "\n" (p: ''
-            cp ${pkgs.writeText p.filename p.content} \
+            cp ${writeText p.filename p.content} \
                "$appdir/Contents/Resources/LaunchDaemons/${p.filename}"
           '') renderedServices}
         ''}

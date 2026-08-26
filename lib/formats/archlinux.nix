@@ -1,7 +1,6 @@
 {
-  pkgs,
+  stdenv,
   lib,
-  deps,
   utils,
   desktop,
   services,
@@ -10,17 +9,46 @@
   format,
   meta,
   target,
+  libarchive,
+  zstd,
+  gzip,
+  gnutar,
+  patchelf,
+  file,
+  gnugrep,
+  rsync,
+  coreutils,
+  gnused,
+  gawk,
+  findutils,
+  closureInfo,
+  writeText,
+  ...
 }:
 
 let
+  deps = import ../deps.nix {
+    inherit
+      lib
+      utils
+      closureInfo
+      coreutils
+      file
+      gawk
+      gnugrep
+      gnused
+      patchelf
+      rsync
+      writeText
+      ;
+  };
   common = import ./_common-linux.nix {
     inherit
-      pkgs
       lib
       deps
-      utils
       desktop
       services
+      writeText
       ;
   };
   pkgArch = meta.archArch;
@@ -37,9 +65,10 @@ let
   # installer / install.md use of `releaseUrl`). Append the tarball
   # filename so PKGBUILD's `source=()` resolves to a real asset URL.
   downloadUrl =
-    if meta.downloadUrl != ""
-    then "${meta.downloadUrl}/${aurTarName}"
-    else "https://example.com/releases/${aurTarName}";
+    if meta.downloadUrl != "" then
+      "${meta.downloadUrl}/${aurTarName}"
+    else
+      "https://example.com/releases/${aurTarName}";
 
   # Where the AUR files live relative to $out:
   # - mode = "aur"  → directly in $out
@@ -76,7 +105,7 @@ let
       "${meta.name}-${meta.version}-1-${pkgArch}.pkg.tar.zst";
 
   pkgBlock = lib.optionalString wantPkg ''
-    instSize=$(${pkgs.coreutils}/bin/du -sb "$stage" | ${pkgs.coreutils}/bin/cut -f1)
+    instSize=$(${coreutils}/bin/du -sb "$stage" | ${coreutils}/bin/cut -f1)
     builddate=$(date +%s)
 
     ${lib.optionalString meta.autoDepends (
@@ -123,8 +152,8 @@ let
     } > "$stage/.PKGINFO"
 
     ${lib.optionalString (common.needsPostScripts meta) ''
-      cp ${pkgs.writeText "${meta.name}.install" installScript} "$stage/.INSTALL"
-      ${pkgs.gnused}/bin/sed -i 's/install = .*/&\ninstall = ${meta.name}.install/' "$stage/.PKGINFO" || true
+      cp ${writeText "${meta.name}.install" installScript} "$stage/.INSTALL"
+      ${gnused}/bin/sed -i 's/install = .*/&\ninstall = ${meta.name}.install/' "$stage/.PKGINFO" || true
     ''}
 
     (
@@ -133,7 +162,7 @@ let
       [ -f .INSTALL ] && mtree_extra=".INSTALL"
       LANG=C bsdtar -cf - --format=mtree \
         --options='!all,use-set,type,uid,gid,mode,time,size,md5,sha256,link' \
-        .PKGINFO $mtree_extra * | ${pkgs.gzip}/bin/gzip -n -9 > .MTREE
+        .PKGINFO $mtree_extra * | ${gzip}/bin/gzip -n -9 > .MTREE
     )
 
     out_pkg="$out/${meta.name}-${meta.version}-1-${pkgArch}.pkg.tar.zst"
@@ -142,7 +171,7 @@ let
       tar_extra=""
       [ -f .INSTALL ] && tar_extra=".INSTALL"
       LANG=C bsdtar --no-fflags -cf - .PKGINFO .MTREE $tar_extra * \
-        | ${pkgs.zstd}/bin/zstd -19 -T0 -o "$out_pkg"
+        | ${zstd}/bin/zstd -19 -T0 -o "$out_pkg"
     )
   '';
 
@@ -153,14 +182,14 @@ let
     aurStage=$PWD/aur-stage
     rm -rf "$aurStage"
     mkdir -p "$aurStage"
-    ( cd "$stage" && ${pkgs.coreutils}/bin/cp -a --no-preserve=ownership . "$aurStage/" )
+    ( cd "$stage" && ${coreutils}/bin/cp -a --no-preserve=ownership . "$aurStage/" )
     rm -f "$aurStage/.PKGINFO" "$aurStage/.MTREE" "$aurStage/.INSTALL"
 
     aurTar="$aurDir/${aurTarName}"
-    ( cd "$aurStage" && ${pkgs.gnutar}/bin/tar --owner=0 --group=0 --sort=name \
+    ( cd "$aurStage" && ${gnutar}/bin/tar --owner=0 --group=0 --sort=name \
         -czf "$aurTar" . )
 
-    aurSha=$(${pkgs.coreutils}/bin/sha256sum "$aurTar" | ${pkgs.coreutils}/bin/cut -d' ' -f1)
+    aurSha=$(${coreutils}/bin/sha256sum "$aurTar" | ${coreutils}/bin/cut -d' ' -f1)
 
     cat > "$aurDir/PKGBUILD" <<EOF
     # Maintainer: ${meta.maintainer}
@@ -184,10 +213,10 @@ let
       ${packageCopyLines}
     }
     EOF
-    ${pkgs.gnused}/bin/sed -i 's/^    //' "$aurDir/PKGBUILD"
+    ${gnused}/bin/sed -i 's/^    //' "$aurDir/PKGBUILD"
 
     ${lib.optionalString (common.needsPostScripts meta) ''
-      cp ${pkgs.writeText "${aurPkgname}.install" installScript} "$aurDir/${aurPkgname}.install"
+      cp ${writeText "${aurPkgname}.install" installScript} "$aurDir/${aurPkgname}.install"
     ''}
 
     {
@@ -216,10 +245,10 @@ let
     } > "$aurDir/.SRCINFO"
   '';
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = drvName;
   dontUnpack = true;
-  nativeBuildInputs = with pkgs; [
+  nativeBuildInputs = [
     libarchive
     zstd
     gzip

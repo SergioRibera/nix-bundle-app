@@ -1,4 +1,4 @@
-{ pkgs, lib }:
+{ lib }:
 
 # Generates a "ready-to-upload" release directory: every bundle artifact in
 # the matrix + an `install.sh` (Linux/macOS) + `install.ps1` (Windows) +
@@ -564,7 +564,16 @@ let
       Remove-Item -Recurse -Force $Tmp.FullName
     '';
 
+  # Both curried on their own tool deps first — one `callPackage` call per
+  # derivation, right where each is actually exposed, rather than this whole
+  # file taking `pkgs` and baking in one fixed splice for every caller.
   release =
+    {
+      runCommand,
+      writeText,
+      coreutils,
+      findutils,
+    }:
     bundlerBundle:
     {
       info ? { },
@@ -623,8 +632,7 @@ let
         mkdir -p "$(dirname "$out/${b.outFile}")"
         cp -L "${b.drv}/${b.outFile}" "$out/${b.outFile}"
         chmod u+w "$out/${b.outFile}"
-        ${lib.optionalString
-          (b.format == "archlinux" && (b.drv.passthru.archlinuxMode or "pkg") == "both")
+        ${lib.optionalString (b.format == "archlinux" && (b.drv.passthru.archlinuxMode or "pkg") == "both")
           ''
             # The `archlinux` format with `output = "both"` writes a
             # PKGBUILD + .SRCINFO + source tarball into `$out/aur/`
@@ -634,13 +642,14 @@ let
             # pipelines pushing to aur.archlinux.org) can find it.
             if [ -d "${b.drv}/aur" ]; then
               mkdir -p "$out/aur"
-              ${pkgs.coreutils}/bin/cp -RL "${b.drv}/aur/." "$out/aur/"
-              ${pkgs.coreutils}/bin/chmod -R u+w "$out/aur"
+              ${coreutils}/bin/cp -RL "${b.drv}/aur/." "$out/aur/"
+              ${coreutils}/bin/chmod -R u+w "$out/aur"
             fi
-          ''}
+          ''
+        }
       '') sorted;
     in
-    pkgs.runCommand "${scriptName}-${scriptVersion}-release"
+    runCommand "${scriptName}-${scriptVersion}-release"
       {
         passthru = {
           bundles = sorted;
@@ -653,24 +662,37 @@ let
         ${cpLines}
 
         ${lib.optionalString installScripts ''
-          cp ${pkgs.writeText "install.sh" installShText} $out/install.sh
+          cp ${writeText "install.sh" installShText} $out/install.sh
           chmod +x $out/install.sh
-          cp ${pkgs.writeText "install.ps1" installPs1Text} $out/install.ps1
+          cp ${writeText "install.ps1" installPs1Text} $out/install.ps1
         ''}
 
-        cp ${pkgs.writeText "INSTALL.md" installMdText} $out/INSTALL.md
+        cp ${writeText "INSTALL.md" installMdText} $out/INSTALL.md
 
-        ( cd $out && ${pkgs.findutils}/bin/find . -type f ! -name SHA256SUMS -printf '%P\n' \
+        ( cd $out && ${findutils}/bin/find . -type f ! -name SHA256SUMS -printf '%P\n' \
             | LC_ALL=C sort \
-            | xargs ${pkgs.coreutils}/bin/sha256sum -- > SHA256SUMS )
+            | xargs ${coreutils}/bin/sha256sum -- > SHA256SUMS )
       '';
 
   installScripts =
+    {
+      runCommand,
+      writeText,
+      coreutils,
+      findutils,
+    }:
     bundlerBundle: args:
     let
-      r = release bundlerBundle (args // { installScripts = true; });
+      r = release {
+        inherit
+          runCommand
+          writeText
+          coreutils
+          findutils
+          ;
+      } bundlerBundle (args // { installScripts = true; });
     in
-    pkgs.runCommand "${r.passthru.info.name}-install-scripts" { } ''
+    runCommand "${r.passthru.info.name}-install-scripts" { } ''
       mkdir -p $out
       cp ${r}/install.sh $out/install.sh
       cp ${r}/install.ps1 $out/install.ps1

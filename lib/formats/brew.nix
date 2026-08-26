@@ -1,27 +1,26 @@
 {
-  pkgs,
+  callPackage,
+  stdenv,
   lib,
-  deps,
   utils,
   desktop,
   services,
-  signing,
   drv,
   format,
   meta,
   target,
+  coreutils,
+  gnused,
+  writeText,
+  ...
 }:
 
 let
-  tarball = import ./tarball.nix {
+  tarball = callPackage ./tarball.nix {
     inherit
-      pkgs
-      lib
-      deps
       utils
       desktop
       services
-      signing
       drv
       target
       ;
@@ -101,25 +100,25 @@ let
     ]
   );
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = "${meta.name}-${meta.version}-brew";
   dontUnpack = true;
   nativeBuildInputs = [
-    pkgs.coreutils
-    pkgs.gnused
+    coreutils
+    gnused
   ];
 
   buildCommand = ''
     mkdir -p $out
     cp ${tarball}/${tarballFilename} "$out/${tarballFilename}"
 
-    sha=$(${pkgs.coreutils}/bin/sha256sum "$out/${tarballFilename}" | ${pkgs.coreutils}/bin/cut -d' ' -f1)
+    sha=$(${coreutils}/bin/sha256sum "$out/${tarballFilename}" | ${coreutils}/bin/cut -d' ' -f1)
 
-    cp ${pkgs.writeText "formula.rb" formula} "$out/${meta.name}.rb"
+    cp ${writeText "formula.rb" formula} "$out/${meta.name}.rb"
     chmod u+w "$out/${meta.name}.rb"
-    ${pkgs.gnused}/bin/sed -i "s/PLACEHOLDER_SHA256_REPLACE_AFTER_UPLOAD/$sha/" "$out/${meta.name}.rb"
+    ${gnused}/bin/sed -i "s/PLACEHOLDER_SHA256_REPLACE_AFTER_UPLOAD/$sha/" "$out/${meta.name}.rb"
 
-    cp ${pkgs.writeText "README-brew.txt" ''
+    cp ${writeText "README-brew.txt" ''
       Upload ${tarballFilename} to a public URL.
       Edit ${meta.name}.rb and set the 'url' field to that URL.
       Then publish ${meta.name}.rb in a tap repo, e.g. homebrew-tap.

@@ -1,7 +1,6 @@
 {
-  pkgs,
+  stdenv,
   lib,
-  deps,
   utils,
   desktop,
   services,
@@ -10,6 +9,19 @@
   format,
   meta,
   target,
+  gnutar,
+  coreutils,
+  patchelf,
+  file,
+  gnugrep,
+  rsync,
+  gnused,
+  gawk,
+  findutils,
+  closureInfo,
+  writeText,
+  writeShellScript,
+  ...
 }:
 
 # Produces a snapcraft source layout (`snapcraft.yaml` + staged payload + a
@@ -18,14 +30,28 @@
 # `./build.sh` on a snapcraft-enabled host to materialise the `.snap`.
 
 let
+  deps = import ../deps.nix {
+    inherit
+      lib
+      utils
+      closureInfo
+      coreutils
+      file
+      gawk
+      gnugrep
+      gnused
+      patchelf
+      rsync
+      writeText
+      ;
+  };
   common = import ./_common-linux.nix {
     inherit
-      pkgs
       lib
       deps
-      utils
       desktop
       services
+      writeText
       ;
   };
 
@@ -98,10 +124,10 @@ let
     echo "Built: $here/${meta.name}_${meta.version}_${snapArch}.snap"
   '';
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = "${meta.name}-${meta.version}-snap-source";
   dontUnpack = true;
-  nativeBuildInputs = with pkgs; [
+  nativeBuildInputs = [
     gnutar
     coreutils
     patchelf
@@ -129,10 +155,10 @@ pkgs.stdenv.mkDerivation {
     rm -rf "$payload/usr"
 
     mkdir -p $out/snap $out/payload
-    ${pkgs.coreutils}/bin/cp -a --no-preserve=ownership "$payload"/. $out/payload/
+    ${coreutils}/bin/cp -a --no-preserve=ownership "$payload"/. $out/payload/
 
-    cp ${pkgs.writeText "snapcraft.yaml" manifestYaml} "$out/snap/snapcraft.yaml"
-    cp ${pkgs.writeShellScript "build.sh" buildScript} "$out/build.sh"
+    cp ${writeText "snapcraft.yaml" manifestYaml} "$out/snap/snapcraft.yaml"
+    cp ${writeShellScript "build.sh" buildScript} "$out/build.sh"
     chmod +x "$out/build.sh"
 
     ${signing.emitSignScript {
