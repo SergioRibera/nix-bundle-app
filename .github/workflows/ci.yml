@@ -333,6 +333,12 @@ jobs:
         shell: bash
         run: ls -laR pkg
 
-      - name: Install + run
-        shell: ${{ matrix.shell }}
+      - name: Install + run (unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: ${{ matrix.run }}
+
+      - name: Install + run (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: ${{ matrix.run }}
