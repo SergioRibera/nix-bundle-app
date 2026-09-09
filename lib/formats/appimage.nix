@@ -113,7 +113,16 @@ pkgs.stdenv.mkDerivation {
       ( cd "$AppDir" && ln -sf "${meta.name}.png" .DirIcon )
     fi
 
-    cp ${pkgs.writeShellScript "AppRun" appRun} "$AppDir/AppRun"
+    # Must NOT use writeShellScript here: it injects a `/nix/store/...-bash`
+    # shebang that dies on any non-Nix host. AppRun needs the portable
+    # `#!/bin/sh` line already baked into `appRun`.
+    cp ${
+      pkgs.writeTextFile {
+        name = "AppRun";
+        text = appRun;
+        executable = true;
+      }
+    } "$AppDir/AppRun"
     chmod +x "$AppDir/AppRun"
 
     mksquashfs "$AppDir" payload.squashfs \

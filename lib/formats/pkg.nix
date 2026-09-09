@@ -80,8 +80,8 @@ pkgs.stdenv.mkDerivation {
     pkgs.gnused
     pkgs.gzip
     pkgs.cpio
-  ]
-  ++ lib.optionals pkgs.stdenv.isLinux [
+    # xar + bomutils on every host so we never fall through to the tar-gzip
+    # fallback that Apple's `installer` refuses ("invalid package path").
     pkgs.bomutils
     pkgs.xar
   ];
@@ -145,29 +145,8 @@ pkgs.stdenv.mkDerivation {
             PackageInfo Bom Payload ${lib.optionalString hasServices "Scripts"} )
       '';
 
-      darwinBuild = ''
-        ${stageRoot}
-        mkdir -p $out
-        if command -v pkgbuild >/dev/null 2>&1; then
-          ${lib.optionalString hasServices ''
-            mkdir -p scripts
-            cp ${pkgs.writeText "postinstall" postinstallText} scripts/postinstall
-            chmod 755 scripts/postinstall
-          ''}
-          pkgbuild \
-            --root "$root" \
-            --identifier "${meta.bundleId}" \
-            --version "${meta.version}" \
-            --install-location ${installLocation} \
-            ${lib.optionalString hasServices "--scripts scripts"} \
-            "$out/${outFile}"
-        else
-          echo "pkgbuild not on PATH; falling back to manual flat pkg" >&2
-          ${pkgs.gnutar}/bin/tar -czf "$out/${outFile}" -C "$root" .
-        fi
-      '';
     in
-    (if pkgs.stdenv.isDarwin then darwinBuild else linuxBuild)
+    linuxBuild
     + signing.emitSignScript {
       inherit meta format;
       artifactGlob = "*.pkg";

@@ -119,8 +119,8 @@ pkgs.stdenv.mkDerivation {
   nativeBuildInputs = [
     pkgs.coreutils
     pkgs.gnused
-  ]
-  ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.xar ];
+    pkgs.xar
+  ];
 
   buildCommand =
     let
@@ -152,22 +152,8 @@ pkgs.stdenv.mkDerivation {
           Distribution Resources ${innerFile}
       '';
 
-      darwinBuild = ''
-        ${stageInner}
-        mkdir -p $out
-        if command -v productbuild >/dev/null 2>&1; then
-          productbuild \
-            --distribution Distribution \
-            --resources Resources \
-            --package-path . \
-            "$out/${outFile}"
-        else
-          ${pkgs.xar}/bin/xar --compression none -cf "$out/${outFile}" \
-            Distribution Resources ${innerFile}
-        fi
-      '';
     in
-    (if pkgs.stdenv.isDarwin then darwinBuild else linuxBuild)
+    linuxBuild
     + signing.emitSignScript {
       inherit meta format;
       artifactGlob = "*-install.pkg";

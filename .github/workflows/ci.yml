@@ -287,6 +287,9 @@ jobs:
             run: |
               set -eux
               app=$(find ./pkg -maxdepth 3 -name '*.app' -type d | head -1)
+              # actions/upload-artifact zips the tree and loses the exec bit
+              # on the way in — re-set it before running.
+              chmod +x "$app/Contents/MacOS/hello"
               "$app/Contents/MacOS/hello" | grep -q "Hello, world!"
           - name: dmg
             runs-on: macos-latest
@@ -296,10 +299,11 @@ jobs:
               set -eux
               dmg=$(ls ./pkg/*.dmg | head -1)
               mp=$(mktemp -d)
-              hdiutil attach "$dmg" -mountpoint "$mp" -nobrowse -quiet
+              hdiutil attach "$dmg" -mountpoint "$mp" -nobrowse -readonly
               app=$(find "$mp" -maxdepth 3 -name '*.app' -type d | head -1)
+              [ -n "$app" ] || { echo "no .app inside dmg"; ls -laR "$mp"; exit 1; }
               "$app/Contents/MacOS/hello" | grep -q "Hello, world!"
-              hdiutil detach "$mp" -quiet
+              hdiutil detach "$mp"
           - name: pkg
             runs-on: macos-latest
             artifact: bundle-darwin-native-hello-pkg

@@ -41,6 +41,18 @@ let
     if [ -d "${drv}/share" ]; then
       ${pkgs.rsync}/bin/rsync -a --copy-links "${drv}/share/" "$stage/share/" || true
     fi
+
+    chmod -R u+w "$stage"
+
+    # Point ELFs at the system loader and $ORIGIN/../lib so the extracted zip
+    # runs on non-Nix hosts. Without this the binaries carry a
+    # /nix/store/... interpreter that only exists on the build machine.
+    ${deps.patchLinuxBinaries {
+      binDir = "$stage/bin";
+      inherit target;
+      keepInterpreter = meta.keepInterpreter;
+      setBundledRpath = true;
+    }}
   '';
 
   prep =
