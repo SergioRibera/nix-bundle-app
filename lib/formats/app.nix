@@ -60,6 +60,7 @@ pkgs.stdenv.mkDerivation {
         ${deps.copyDarwinLibs drv "$appdir/Contents/Frameworks"}
         ${deps.copyResources drv "$appdir/Contents/Resources/share"}
 
+        ${deps.patchDarwinLibs "$appdir/Contents/Frameworks"}
         ${deps.patchDarwinBinaries "$appdir/Contents/MacOS"}
 
         ${lib.optionalString (meta.macOsIcon != null) ''

@@ -170,6 +170,33 @@ let
     done
   '';
 
+  # Rewrite install-names of dylibs so their sibling references resolve inside
+  # the bundle. Without this a copied libfoo.dylib keeps a
+  # `/nix/store/...-libbar/lib/libbar.dylib` LC_LOAD_DYLIB entry that dyld
+  # can't find on any machine without Nix.
+  patchDarwinLibs = libDir: ''
+    have_tool() { command -v "$1" >/dev/null 2>&1; }
+    if ! have_tool install_name_tool; then
+      echo "install_name_tool not available on host (need darwin)." >&2
+    else
+      for lib in ${libDir}/*.dylib; do
+        [ -f "$lib" ] || continue
+        if ${pkgs.file}/bin/file -b "$lib" | ${pkgs.gnugrep}/bin/grep -q "Mach-O"; then
+          bn=$(basename "$lib")
+          chmod u+w "$lib" 2>/dev/null || true
+          install_name_tool -id "@rpath/$bn" "$lib" 2>/dev/null || true
+          for dep in $(otool -L "$lib" | tail -n +2 | awk '{print $1}'); do
+            case "$dep" in
+              /nix/store/*)
+                depbn=$(basename "$dep")
+                install_name_tool -change "$dep" "@loader_path/$depbn" "$lib" || true ;;
+            esac
+          done
+        fi
+      done
+    fi
+  '';
+
   copyBinaries = drv: destBinDir: ''
     mkdir -p "${destBinDir}"
     if [ -d "${drv}/bin" ]; then
@@ -247,6 +274,7 @@ in
     copyWindowsDlls
     patchLinuxBinaries
     patchDarwinBinaries
+    patchDarwinLibs
     copyBinaries
     copyResources
     libMap
