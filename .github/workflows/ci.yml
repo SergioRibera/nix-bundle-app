@@ -162,3 +162,177 @@ jobs:
           path: artifacts/${{ matrix.group }}/${{ matrix.attr }}/**
           if-no-files-found: error
           retention-days: 14
+
+  # Install + run each generated bundle on a clean runner that has NO Nix.
+  # Verifies the artifact ships everything the target OS needs (runtime libs,
+  # loader, desktop scaffolding, installer scripts).
+  smoke:
+    name: smoke · ${{ matrix.name }}
+    needs: bundle
+    runs-on: ${{ matrix.runs-on }}
+    container: ${{ matrix.container }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ---- linux, host runner (no container) ----
+          - name: deb
+            runs-on: ubuntu-latest
+            artifact: bundle-linux-hello-deb
+            shell: bash
+            run: |
+              set -eux
+              sudo apt-get update -qq
+              sudo dpkg -i ./pkg/*.deb || sudo apt-get -f install -y
+              hello | grep -q "Hello, world!"
+          - name: appimage
+            runs-on: ubuntu-latest
+            artifact: bundle-linux-hello-appimage
+            shell: bash
+            run: |
+              set -eux
+              img=$(ls ./pkg/*.AppImage | head -1)
+              chmod +x "$img"
+              "$img" --appimage-extract >/dev/null
+              ./squashfs-root/AppRun | grep -q "Hello, world!"
+          - name: tar-gz
+            runs-on: ubuntu-latest
+            artifact: bundle-linux-hello-tar-gz
+            shell: bash
+            run: |
+              set -eux
+              mkdir extract
+              tar -xzf ./pkg/*.tar.gz -C extract
+              bin=$(find extract -type f -name hello -perm -u+x | head -1)
+              "$bin" | grep -q "Hello, world!"
+          - name: tar-xz
+            runs-on: ubuntu-latest
+            artifact: bundle-linux-hello-tar-xz
+            shell: bash
+            run: |
+              set -eux
+              mkdir extract
+              tar -xJf ./pkg/*.tar.xz -C extract
+              bin=$(find extract -type f -name hello -perm -u+x | head -1)
+              "$bin" | grep -q "Hello, world!"
+          - name: zip-linux
+            runs-on: ubuntu-latest
+            artifact: bundle-linux-hello-zip
+            shell: bash
+            run: |
+              set -eux
+              sudo apt-get install -y -qq unzip
+              mkdir extract
+              unzip -q ./pkg/*.zip -d extract
+              bin=$(find extract -type f -name hello -perm -u+x | head -1)
+              "$bin" | grep -q "Hello, world!"
+          # ---- linux, container (native pkg manager) ----
+          - name: rpm
+            runs-on: ubuntu-latest
+            container: fedora:latest
+            artifact: bundle-linux-hello-rpm
+            shell: bash
+            run: |
+              set -eux
+              dnf install -y ./pkg/*.rpm
+              hello | grep -q "Hello, world!"
+          - name: archlinux
+            runs-on: ubuntu-latest
+            container: archlinux:latest
+            artifact: bundle-linux-hello-archlinux
+            shell: bash
+            run: |
+              set -eux
+              pacman -Sy --noconfirm
+              pkg=$(find ./pkg -maxdepth 1 -name '*.pkg.tar.zst' | head -1)
+              pacman -U --noconfirm "$pkg"
+              hello | grep -q "Hello, world!"
+          # ---- windows ----
+          - name: nsis
+            runs-on: windows-latest
+            artifact: bundle-windows-hello-nsis
+            shell: pwsh
+            run: |
+              $inst = Get-ChildItem pkg -Filter *.exe | Select-Object -First 1
+              Start-Process -FilePath $inst.FullName -ArgumentList "/S" -Wait
+              $bin = Get-ChildItem "C:\Program Files","C:\Program Files (x86)","$env:LOCALAPPDATA" -Recurse -Filter hello.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+              if (-not $bin) { throw "hello.exe not found after NSIS install" }
+              & $bin.FullName | Select-String -Quiet "Hello, world!"
+          - name: msi
+            runs-on: windows-latest
+            artifact: bundle-windows-hello-msi
+            shell: pwsh
+            run: |
+              $msi = Get-ChildItem pkg -Filter *.msi | Select-Object -First 1
+              Start-Process msiexec.exe -ArgumentList "/i","`"$($msi.FullName)`"","/quiet","/norestart" -Wait
+              $bin = Get-ChildItem "C:\Program Files","C:\Program Files (x86)","$env:LOCALAPPDATA" -Recurse -Filter hello.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+              if (-not $bin) { throw "hello.exe not found after MSI install" }
+              & $bin.FullName | Select-String -Quiet "Hello, world!"
+          - name: zip-windows
+            runs-on: windows-latest
+            artifact: bundle-windows-hello-windows-zip
+            shell: pwsh
+            run: |
+              $zip = Get-ChildItem pkg -Filter *.zip | Select-Object -First 1
+              Expand-Archive -Path $zip.FullName -DestinationPath extract
+              $bin = Get-ChildItem extract -Recurse -Filter hello.exe | Select-Object -First 1
+              if (-not $bin) { throw "hello.exe not found in zip" }
+              & $bin.FullName | Select-String -Quiet "Hello, world!"
+          # ---- darwin (native artifacts built on macos-latest) ----
+          - name: app
+            runs-on: macos-latest
+            artifact: bundle-darwin-native-hello-app
+            shell: bash
+            run: |
+              set -eux
+              app=$(find ./pkg -maxdepth 3 -name '*.app' -type d | head -1)
+              "$app/Contents/MacOS/hello" | grep -q "Hello, world!"
+          - name: dmg
+            runs-on: macos-latest
+            artifact: bundle-darwin-native-hello-dmg
+            shell: bash
+            run: |
+              set -eux
+              dmg=$(ls ./pkg/*.dmg | head -1)
+              mp=$(mktemp -d)
+              hdiutil attach "$dmg" -mountpoint "$mp" -nobrowse -quiet
+              app=$(find "$mp" -maxdepth 3 -name '*.app' -type d | head -1)
+              "$app/Contents/MacOS/hello" | grep -q "Hello, world!"
+              hdiutil detach "$mp" -quiet
+          - name: pkg
+            runs-on: macos-latest
+            artifact: bundle-darwin-native-hello-pkg
+            shell: bash
+            run: |
+              set -eux
+              pkg=$(ls ./pkg/*.pkg | head -1)
+              sudo installer -pkg "$pkg" -target /
+              bin=$(command -v hello || find /Applications /usr/local /opt -name hello -perm -u+x 2>/dev/null | head -1)
+              [ -n "$bin" ] || { echo "hello not found after pkg install"; exit 1; }
+              "$bin" | grep -q "Hello, world!"
+          - name: productbuild
+            runs-on: macos-latest
+            artifact: bundle-darwin-native-hello-productbuild
+            shell: bash
+            run: |
+              set -eux
+              pkg=$(ls ./pkg/*.pkg | head -1)
+              sudo installer -pkg "$pkg" -target /
+              bin=$(command -v hello || find /Applications /usr/local /opt -name hello -perm -u+x 2>/dev/null | head -1)
+              [ -n "$bin" ] || { echo "hello not found after productbuild install"; exit 1; }
+              "$bin" | grep -q "Hello, world!"
+    steps:
+      - name: Download bundle artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: pkg
+
+      - name: List downloaded contents
+        shell: bash
+        run: ls -laR pkg
+
+      - name: Install + run
+        shell: ${{ matrix.shell }}
+        run: ${{ matrix.run }}
