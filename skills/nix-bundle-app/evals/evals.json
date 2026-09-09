@@ -4,29 +4,29 @@
     {
       "id": 1,
       "name": "rust-cli-deb-rpm",
-      "prompt": "I have a Rust CLI tool built with crane that lives in `self.packages.${system}.my-tool` in my flake. I want to ship .deb and .rpm packages from it so my users on Debian and Fedora can `apt install` / `dnf install` it. I'm the maintainer, my email is sergio@example.com, license is MIT, homepage is https://github.com/sergio/my-tool. Give me the flake snippet — I want `nix build .#my-tool-deb` and `nix build .#my-tool-rpm` to work.",
-      "expected_output": "A flake snippet that adds `nix-bundle-app` as an input, calls `bundler.bundle` (or `bundler.bundleAll`) for the deb and rpm formats with maintainer/license/homepage info set, and produces packages named `my-tool-deb` and `my-tool-rpm`.",
+      "prompt": "I have a Rust CLI tool built with crane that lives in a derivation called `my-tool`. I want to ship .deb and .rpm packages from it so my users on Debian and Fedora can `apt install` / `dnf install` it. I'm the maintainer, my email is sergio@example.com, license is MIT, homepage is https://github.com/sergio/my-tool. Give me the Nix snippet — I want `nix-build -A my-tool-deb` and `nix-build -A my-tool-rpm` to work.",
+      "expected_output": "A Nix snippet that applies overlay.nix to pkgs (via pkgs.extend or overlays = [...]) to get pkgs.nixBundleApp, then calls bundler.bundle (or bundler.bundleAll) for the deb and rpm formats with maintainer/license/homepage info set, producing attributes named my-tool-deb and my-tool-rpm.",
       "files": []
     },
     {
       "id": 2,
       "name": "release-matrix-install-script",
-      "prompt": "I have cross-compiled my Go application for x86_64-linux, aarch64-linux, x86_64-darwin, aarch64-darwin, and x86_64-windows. The cross drvs are at `pkgs.x.<system>.myapp` in my flake. I want to publish a GitHub release where users can do `curl -fsSL https://github.com/foo/myapp/releases/latest/download/install.sh | sh` and get the right binary. Version is 1.0.0, MIT licensed. Give me the flake snippet.",
-      "expected_output": "A flake snippet using `bundler.release` with the matrix attrset covering all five targets, including portable tar.gz/zip formats plus optional native installers, with `releaseUrl` set to the GitHub releases download URL using `${VERSION}` (literal) and `installScripts = true` (or default).",
+      "prompt": "I have cross-compiled my Go application for x86_64-linux, aarch64-linux, x86_64-darwin, aarch64-darwin, and x86_64-windows. The cross drvs are at `myapp.<system>`. I want to publish a GitHub release where users can do `curl -fsSL https://github.com/foo/myapp/releases/latest/download/install.sh | sh` and get the right binary. Version is 1.0.0, MIT licensed. Give me the Nix snippet.",
+      "expected_output": "A Nix snippet using bundler.release with the matrix attrset covering all five targets, including portable tar.gz/zip formats plus optional native installers, with releaseUrl set to the GitHub releases download URL using ${VERSION} (literal) and installScripts = true (or default).",
       "files": []
     },
     {
       "id": 3,
       "name": "gui-app-appimage-with-desktop",
-      "prompt": "I'm packaging a GUI image viewer called `pixview` built from a Tauri app (`self.packages.${system}.pixview`). I want a single-file Linux distribution — an AppImage. It should show up in the application launcher as 'Pixview' under the Graphics category, with an icon I have at `./assets/pixview.png`, and register as the default handler for `image/png` and `image/jpeg`. Give me the flake snippet.",
-      "expected_output": "A flake snippet calling `bundler.bundle` with `format = \"appimage\"`, setting `info.desktopEntries` with name, exec, categories=[\"Graphics\"], icon, iconPath pointing to the PNG, and mimeTypes for PNG/JPEG.",
+      "prompt": "I'm packaging a GUI image viewer called `pixview` built from a Tauri app (derivation `pixview`). I want a single-file Linux distribution — an AppImage. It should show up in the application launcher as 'Pixview' under the Graphics category, with an icon I have at `./assets/pixview.png`, and register as the default handler for `image/png` and `image/jpeg`. Give me the Nix snippet.",
+      "expected_output": "A Nix snippet calling bundler.bundle with format = \"appimage\", setting info.desktopEntries with name, exec, categories=[\"Graphics\"], icon, iconPath pointing to the PNG, and mimeTypes for PNG/JPEG.",
       "files": []
     },
     {
       "id": 4,
       "name": "signed-msi-with-service",
-      "prompt": "I need to ship a Windows MSI of my sync agent. The drv (cross-compiled with mingwW64) is at `pkgs.pkgsCross.mingwW64.sync-agent`. I want it to install a Windows service that runs the agent on boot (auto-start), and the MSI needs to be Authenticode-signed with my cert at `./certs/auth.pfx`. The cert password will come from an env var. Also, I plan to ship updates so the UpgradeCode must be stable. Give me the flake snippet plus the command I'll run to sign.",
-      "expected_output": "Flake snippet calling `bundler.bundle` with `format = \"msi\"`, `target = { arch = \"x86_64\"; os = \"windows\"; }`, an `info.services` entry with restart/exec for the agent, `info.msiUpgradeCode` pinned to a UUID, `info.signing.windows.enable = true` with pkcs12File pointing at the cert and timestampUrl set. Plus an explanation that signing runs after `nix build` via `P12_PASSWORD=... ./result/sign.sh`, or one-shot via `bundler.signedApp`.",
+      "prompt": "I need to ship a Windows MSI of my sync agent. The drv (cross-compiled with mingwW64) is at `pkgs.pkgsCross.mingwW64.sync-agent`. I want it to install a Windows service that runs the agent on boot (auto-start), and the MSI needs to be Authenticode-signed with my cert at `./certs/auth.pfx`. The cert password will come from an env var. Also, I plan to ship updates so the UpgradeCode must be stable. Give me the Nix snippet plus the command I'll run to sign.",
+      "expected_output": "Nix snippet calling bundler.bundle with format = \"msi\", target = { arch = \"x86_64\"; os = \"windows\"; }, an info.services entry with restart/exec for the agent, info.msiUpgradeCode pinned to a UUID, info.signing.windows.enable = true with pkcs12File pointing at the cert and timestampUrl set. Plus an explanation that signing runs after building the bundle via P12_PASSWORD=... ./result/sign.sh, or one-shot via bundler.signedApp (nix-build -A <name>-signed then run the resulting ./result/bin/<name>-sign).",
       "files": []
     }
   ]

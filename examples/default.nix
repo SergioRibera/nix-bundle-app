@@ -1,8 +1,23 @@
-{ pkgs, bundler }:
+{
+  pkgs ? import <nixpkgs> { },
+  bundler ? (pkgs.extend (import ../overlay.nix)).nixBundleApp,
+}:
 
 let
-  helloLinux = pkgs.hello;
-  helloWindows = if pkgs.stdenv.isLinux then pkgs.pkgsCross.mingwW64.hello else pkgs.hello;
+  # Each drv genuinely targets its name (native when the host already
+  # matches, cross-compiled otherwise) since not every bundle below passes
+  # an explicit `target`.
+  helloLinux =
+    if pkgs.stdenv.hostPlatform.system == "x86_64-linux" then
+      pkgs.hello
+    else
+      pkgs.pkgsCross.gnu64.hello;
+  helloWindows = pkgs.pkgsCross.mingwW64.hello;
+  helloDarwin =
+    if pkgs.stdenv.hostPlatform.system == "x86_64-darwin" then
+      pkgs.hello
+    else
+      pkgs.pkgsCross.x86_64-darwin.hello;
 
   commonInfo = {
     description = "GNU Hello, the canonical example program";
@@ -124,7 +139,7 @@ in
   };
 
   hello-app = bundler.bundle {
-    drv = helloLinux;
+    drv = helloDarwin;
     format = "app";
     info = commonInfo;
     target = {
@@ -134,7 +149,7 @@ in
   };
 
   hello-brew = bundler.bundle {
-    drv = helloLinux;
+    drv = helloDarwin;
     format = "brew";
     info = commonInfo // {
       downloadUrl = "https://example.com/releases/hello.tar.gz";
@@ -145,19 +160,15 @@ in
     };
   };
 
-  hello-dmg =
-    if pkgs.stdenv.isLinux || pkgs.stdenv.isDarwin then
-      bundler.bundle {
-        drv = helloLinux;
-        format = "dmg";
-        info = commonInfo;
-        target = {
-          arch = "x86_64";
-          os = "darwin";
-        };
-      }
-    else
-      null;
+  hello-dmg = bundler.bundle {
+    drv = helloDarwin;
+    format = "dmg";
+    info = commonInfo;
+    target = {
+      arch = "x86_64";
+      os = "darwin";
+    };
+  };
 
   hello-nsis = bundler.bundle {
     drv = helloWindows;
@@ -211,7 +222,7 @@ in
   };
 
   hello-pkg = bundler.bundle {
-    drv = helloLinux;
+    drv = helloDarwin;
     format = "pkg";
     info = commonInfo;
     target = {
@@ -221,7 +232,7 @@ in
   };
 
   hello-productbuild = bundler.bundle {
-    drv = helloLinux;
+    drv = helloDarwin;
     format = "productbuild";
     info = commonInfo // {
       productbuild = {
@@ -277,7 +288,7 @@ in
   };
 
   hello-all-darwin = bundler.bundleAll {
-    drv = helloLinux;
+    drv = helloDarwin;
     formats = [
       "app"
       "dmg"
@@ -309,7 +320,7 @@ in
   };
   # Intentionally no `hello-service-appimage`: schema asserts AppImage+services.
   hello-service-app = bundler.bundle {
-    drv = helloLinux;
+    drv = helloDarwin;
     format = "app";
     info = serviceInfo;
     target = {
@@ -318,7 +329,7 @@ in
     };
   };
   hello-service-pkg = bundler.bundle {
-    drv = helloLinux;
+    drv = helloDarwin;
     format = "pkg";
     info = serviceInfo;
     target = {
@@ -358,7 +369,7 @@ in
         ];
       };
       "x86_64-darwin" = {
-        drv = helloLinux;
+        drv = helloDarwin;
         formats = [ "tar.gz" ];
       };
       "x86_64-windows" = {

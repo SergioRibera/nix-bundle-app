@@ -9,7 +9,9 @@ let
     drv
     info
     pkgs
+    canRpm
     ;
+  inherit (pkgs) lib;
 
   inlineModprobe = "options demo_mod debug=1\n";
   inlineModulesLoad = "demo_mod\n";
@@ -34,19 +36,20 @@ in
     expect = "hello_*_amd64.deb";
   };
 
-  bundle-extra-files-rpm = check {
-    name = "extra-files-rpm";
-    format = "rpm";
-    inherit drv;
-    info = extraInfo;
-    expect = "hello-*-1.x86_64.rpm";
-  };
-
   bundle-extra-files-archlinux = check {
     name = "extra-files-archlinux";
     format = "archlinux";
     inherit drv;
     info = extraInfo;
     expect = "hello-*-1-x86_64.pkg.tar.zst";
+  };
+}
+// lib.optionalAttrs canRpm {
+  bundle-extra-files-rpm = check {
+    name = "extra-files-rpm";
+    format = "rpm";
+    inherit drv;
+    info = extraInfo;
+    expect = "hello-*-1.x86_64.rpm";
   };
 }

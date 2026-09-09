@@ -1,17 +1,39 @@
 {
-  pkgs,
+  stdenv,
   lib,
-  deps,
+  utils,
   services,
   signing,
   drv,
   format,
   meta,
   target,
+  file,
+  gnugrep,
+  gawk,
+  rsync,
+  coreutils,
+  gnused,
+  patchelf,
+  closureInfo,
   ...
 }:
 
 let
+  deps = import ../deps.nix {
+    inherit
+      lib
+      utils
+      closureInfo
+      coreutils
+      file
+      gawk
+      gnugrep
+      gnused
+      patchelf
+      rsync
+      ;
+  };
   appName = "${meta.name}.app";
   execName = meta.name;
   renderedServices = services.renderAllLaunchd meta.services;
@@ -40,10 +62,10 @@ let
     </plist>
   '';
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = "${meta.name}-${meta.version}.app";
   dontUnpack = true;
-  nativeBuildInputs = with pkgs; [
+  nativeBuildInputs = [
     file
     gnugrep
     rsync
@@ -60,6 +82,11 @@ pkgs.stdenv.mkDerivation {
         ${deps.copyDarwinLibs drv "$appdir/Contents/Frameworks"}
         ${deps.copyResources drv "$appdir/Contents/Resources/share"}
 
+        ${deps.verifyStagedBinaries {
+          binDir = "$appdir/Contents/MacOS";
+          inherit target;
+        }}
+
         ${deps.patchDarwinBinaries "$appdir/Contents/MacOS"}
 
         ${lib.optionalString (meta.macOsIcon != null) ''
@@ -69,7 +96,7 @@ pkgs.stdenv.mkDerivation {
         cat > "$appdir/Contents/Info.plist" <<'EOF'
     ${plist}
     EOF
-        ${pkgs.gnused}/bin/sed -i 's/^    //' "$appdir/Contents/Info.plist"
+        ${gnused}/bin/sed -i 's/^    //' "$appdir/Contents/Info.plist"
 
         cat > "$appdir/Contents/PkgInfo" <<EOF
     APPL${meta.bundleSignature}
@@ -80,10 +107,13 @@ pkgs.stdenv.mkDerivation {
           # register them as system services you need a .pkg installer (which
           # copies them to /Library/LaunchDaemons) — see the `pkg` format.
           mkdir -p "$appdir/Contents/Resources/LaunchDaemons"
-          ${lib.concatMapStringsSep "\n" (p: ''
-            cp ${pkgs.writeText p.filename p.content} \
-               "$appdir/Contents/Resources/LaunchDaemons/${p.filename}"
-          '') renderedServices}
+          ${lib.concatStrings (
+            lib.imap1 (i: p: ''
+              cat > "$appdir/Contents/Resources/LaunchDaemons/${p.filename}" <<'LAUNCHD_${toString i}_EOF'
+              ${p.content}
+              LAUNCHD_${toString i}_EOF
+            '') renderedServices
+          )}
         ''}
 
         ${signing.emitSignScript {

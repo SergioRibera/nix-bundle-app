@@ -18,7 +18,7 @@
       "category": "packaging",
       "tags": [
         "nix",
-        "flake",
+        "overlay",
         "bundle",
         "installer",
         "packaging",

@@ -1,7 +1,14 @@
 {
-  pkgs,
   lib,
   utils,
+  closureInfo,
+  coreutils,
+  file,
+  gawk,
+  gnugrep,
+  gnused,
+  patchelf,
+  rsync,
 }:
 
 let
@@ -28,7 +35,7 @@ let
     "libc++abi"
   ];
 
-  closureOf = drv: pkgs.closureInfo { rootPaths = if builtins.isList drv then drv else [ drv ]; };
+  closureOf = drv: closureInfo { rootPaths = if builtins.isList drv then drv else [ drv ]; };
 
   copyLinuxLibs =
     drv: destLibDir:
@@ -129,20 +136,20 @@ let
     ''
       for bin in ${binDir}/*; do
         [ -f "$bin" ] || continue
-        if ${pkgs.file}/bin/file -b "$bin" | ${pkgs.gnugrep}/bin/grep -q "ELF"; then
-          if ${pkgs.patchelf}/bin/patchelf --print-interpreter "$bin" >/dev/null 2>&1; then
+        if ${file}/bin/file -b "$bin" | ${gnugrep}/bin/grep -q "ELF"; then
+          if ${patchelf}/bin/patchelf --print-interpreter "$bin" >/dev/null 2>&1; then
             ${lib.optionalString (!keepInterpreter && interp != null) ''
-              ${pkgs.patchelf}/bin/patchelf --set-interpreter "${interp}" "$bin" || true
+              ${patchelf}/bin/patchelf --set-interpreter "${interp}" "$bin" || true
             ''}
             ${
               if setBundledRpath then
-                ''${pkgs.patchelf}/bin/patchelf --set-rpath '$ORIGIN/../lib' "$bin" || true''
+                ''${patchelf}/bin/patchelf --set-rpath '$ORIGIN/../lib' "$bin" || true''
               else
                 # bundleLibs=false: clear the embedded RPATH so the dynamic
                 # loader falls through to the system path. Without this
                 # patchelf may have stamped a /nix/store path from the
                 # source derivation, which doesn't exist on the target.
-                ''${pkgs.patchelf}/bin/patchelf --remove-rpath "$bin" || true''
+                ''${patchelf}/bin/patchelf --remove-rpath "$bin" || true''
             }
           fi
         fi
@@ -156,7 +163,7 @@ let
     fi
     for bin in ${binDir}/*; do
       [ -f "$bin" ] || continue
-      if ${pkgs.file}/bin/file -b "$bin" | ${pkgs.gnugrep}/bin/grep -q "Mach-O"; then
+      if ${file}/bin/file -b "$bin" | ${gnugrep}/bin/grep -q "Mach-O"; then
         if have_tool install_name_tool; then
           for dep in $(otool -L "$bin" | tail -n +2 | awk '{print $1}'); do
             case "$dep" in
@@ -169,6 +176,63 @@ let
       fi
     done
   '';
+
+  # What `file -b` prints for a binary built for each target: container
+  # format plus its arch string, which isn't uniform (Mach-O uses Apple's
+  # own "x86_64"/"arm64" naming; ELF/PE use "x86-64"/"aarch64").
+  binarySignature = {
+    linux = {
+      magic = "ELF";
+      arch = {
+        x86_64 = "x86-64";
+        aarch64 = "aarch64";
+      };
+    };
+    darwin = {
+      magic = "Mach-O";
+      arch = {
+        x86_64 = "x86_64";
+        aarch64 = "arm64";
+      };
+    };
+    windows = {
+      magic = "PE32";
+      arch = {
+        x86_64 = "x86-64";
+        aarch64 = "aarch64";
+      };
+    };
+  };
+
+  # Fails the build if a staged binary doesn't match `target`. Non-binaries
+  # (scripts, data files) are left alone.
+  verifyStagedBinaries =
+    { binDir, target }:
+    let
+      sig =
+        binarySignature.${target.os}
+          or (throw "nix-bundle-app: no binary-format signature for os '${target.os}'");
+      archNeedle =
+        sig.arch.${target.arch}
+          or (throw "nix-bundle-app: no binary-format signature for ${target.os}/${target.arch}");
+    in
+    ''
+      for __vb_bin in "${binDir}"/*; do
+        [ -f "$__vb_bin" ] || continue
+        __vb_desc=$(${file}/bin/file -b "$__vb_bin" 2>/dev/null) || continue
+        case "$__vb_desc" in
+          *ELF*|*Mach-O*|*PE32*) : ;;
+          *) continue ;; # not a native binary (script, data, …) — nothing to verify
+        esac
+        if
+          ! printf '%s' "$__vb_desc" | ${gnugrep}/bin/grep -qF -- "${sig.magic}" \
+          || ! printf '%s' "$__vb_desc" | ${gnugrep}/bin/grep -qF -- "${archNeedle}"
+        then
+          echo "nix-bundle-app: '$__vb_bin' does not match target ${target.os}/${target.arch} (file: $__vb_desc)" >&2
+          exit 1
+        fi
+      done
+    '';
 
   copyBinaries = drv: destBinDir: ''
     mkdir -p "${destBinDir}"
@@ -183,25 +247,27 @@ let
   copyResources = drv: destShareDir: ''
     if [ -d "${drv}/share" ]; then
       mkdir -p "${destShareDir}"
-      ${pkgs.rsync}/bin/rsync -a --copy-links "${drv}/share/" "${destShareDir}/" || true
+      ${rsync}/bin/rsync -a --copy-links "${drv}/share/" "${destShareDir}/" || true
     fi
   '';
 
   libMap = (import ./lib-map.nix).sonameMap;
 
+  # Plain string, not a derivation — `discoverLinuxDepsSnippet` heredocs
+  # this straight into the caller's own build sandbox instead of spending a
+  # separate store path just to `cat`/`awk` it back out again.
   distroLibMapFile =
     kind:
     let
       sonames = builtins.attrNames libMap;
-      rows = lib.concatMapStringsSep "\n" (
-        n:
-        let
-          pkg = libMap.${n}.${kind} or null;
-        in
-        if pkg == null then "" else "${n}\t${pkg}"
-      ) sonames;
     in
-    pkgs.writeText "nix-bundle-app-libmap-${kind}.tsv" rows;
+    lib.concatMapStringsSep "\n" (
+      n:
+      let
+        pkg = libMap.${n}.${kind} or null;
+      in
+      if pkg == null then "" else "${n}\t${pkg}"
+    ) sonames;
 
   discoverLinuxDepsSnippet =
     {
@@ -211,30 +277,35 @@ let
       outFile,
     }:
     let
-      mapFile = distroLibMapFile kind;
-      userListFile = pkgs.writeText "user-deps-${kind}.txt" (lib.concatMapStrings (s: s + "\n") userDeps);
+      userList = lib.concatMapStrings (s: s + "\n") userDeps;
     in
     ''
+      cat > libmap-${kind}.tsv <<'LIBMAP_EOF'
+      ${distroLibMapFile kind}
+      LIBMAP_EOF
+      cat > user-deps-${kind}.txt <<'USERDEPS_EOF'
+      ${userList}
+      USERDEPS_EOF
       {
         for d in ${lib.concatStringsSep " " scanDirs}; do
           [ -d "$d" ] || continue
           find "$d" -type f \( -name '*.so*' -o -perm -u+x \) -print0 \
             | while IFS= read -r -d "" f; do
-                if ${pkgs.file}/bin/file -b "$f" | ${pkgs.gnugrep}/bin/grep -q "ELF"; then
-                  ${pkgs.patchelf}/bin/patchelf --print-needed "$f" 2>/dev/null || true
+                if ${file}/bin/file -b "$f" | ${gnugrep}/bin/grep -q "ELF"; then
+                  ${patchelf}/bin/patchelf --print-needed "$f" 2>/dev/null || true
                 fi
               done
         done
       } | tr ' ' '\n' | sort -u > sonames.tmp
-      ${pkgs.gawk}/bin/awk -F'\t' \
+      ${gawk}/bin/awk -F'\t' \
         'NR==FNR { if (NF==2) m[$1]=$2; next } m[$0] { print m[$0] }' \
-        ${mapFile} sonames.tmp \
+        libmap-${kind}.tsv sonames.tmp \
         | sort -u > auto-deps.tmp
-      cat ${userListFile} auto-deps.tmp \
-        | ${pkgs.gnused}/bin/sed 's/^ *//;s/ *$//' \
-        | ${pkgs.gnugrep}/bin/grep -v '^$' \
+      cat user-deps-${kind}.txt auto-deps.tmp \
+        | ${gnused}/bin/sed 's/^ *//;s/ *$//' \
+        | ${gnugrep}/bin/grep -v '^$' \
         | sort -u \
-        | ${pkgs.coreutils}/bin/paste -sd, - > "${outFile}"
+        | ${coreutils}/bin/paste -sd, - > "${outFile}"
     '';
 in
 {
@@ -247,6 +318,7 @@ in
     copyWindowsDlls
     patchLinuxBinaries
     patchDarwinBinaries
+    verifyStagedBinaries
     copyBinaries
     copyResources
     libMap

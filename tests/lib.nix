@@ -1,8 +1,14 @@
 { pkgs, bundler }:
 
 let
-  drv = pkgs.hello;
-  drvWin = if pkgs.stdenv.isLinux then pkgs.pkgsCross.mingwW64.hello else pkgs.hello;
+  # Checks below assert hardcoded x86_64 artifact names, so each drv must
+  # genuinely be that target regardless of host — cross-compile unless
+  # already native.
+  isLinuxHost = pkgs.stdenv.hostPlatform.system == "x86_64-linux";
+  isX86_64Darwin = pkgs.stdenv.hostPlatform.system == "x86_64-darwin";
+  drv = if isLinuxHost then pkgs.hello else pkgs.pkgsCross.gnu64.hello;
+  drvWin = pkgs.pkgsCross.mingwW64.hello;
+  drvDarwin = if isX86_64Darwin then pkgs.hello else pkgs.pkgsCross.x86_64-darwin.hello;
 
   rustSrc = ./rust;
   rustName = "nix-bundle-app-rust-demo";
@@ -18,9 +24,21 @@ let
       doCheck = false;
     };
 
-  rustLinux = buildRust pkgs.rustPlatform;
-  rustWindows =
-    if pkgs.stdenv.isLinux then buildRust pkgs.pkgsCross.mingwW64.rustPlatform else rustLinux;
+  rustLinux =
+    if isLinuxHost then buildRust pkgs.rustPlatform else buildRust pkgs.pkgsCross.gnu64.rustPlatform;
+  rustWindows = buildRust pkgs.pkgsCross.mingwW64.rustPlatform;
+  rustDarwin =
+    if isX86_64Darwin then
+      buildRust pkgs.rustPlatform
+    else
+      buildRust pkgs.pkgsCross.x86_64-darwin.rustPlatform;
+
+  # `nsis` is `meta.broken` on darwin in nixpkgs; skip there, CI still runs it.
+  canNsis = !pkgs.stdenv.hostPlatform.isDarwin;
+
+  # rpmbuild only packages for its own host CPU regardless of `--target`, and
+  # this repo has no x86_64-linux builder; skip, CI (x86_64-linux) covers it.
+  canRpm = pkgs.stdenv.hostPlatform.system == "x86_64-linux";
 
   info = {
     homepage = "https://example.com";
@@ -120,9 +138,13 @@ in
     rustInfo
     drv
     drvWin
+    drvDarwin
     rustLinux
     rustWindows
+    rustDarwin
     rustName
     rustVersion
+    canNsis
+    canRpm
     ;
 }

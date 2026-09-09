@@ -10,14 +10,16 @@ let
     rustName
     rustVersion
     rustWindows
+    canNsis
     ;
+  inherit (pkgs) lib;
 
   winTarget = {
     arch = "x86_64";
     os = "windows";
   };
 in
-{
+lib.optionalAttrs canNsis {
   rust-nsis = e2e {
     name = "rust-nsis";
     format = "nsis";
@@ -31,7 +33,8 @@ in
       test "$(stat -c '%s' "$artifact")" -gt 50000
     '';
   };
-
+}
+// {
   rust-msi = e2e {
     name = "rust-msi";
     format = "msi";

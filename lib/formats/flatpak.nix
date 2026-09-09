@@ -1,7 +1,6 @@
 {
-  pkgs,
+  stdenv,
   lib,
-  deps,
   utils,
   desktop,
   services,
@@ -10,6 +9,18 @@
   format,
   meta,
   target,
+  gnutar,
+  gzip,
+  coreutils,
+  patchelf,
+  file,
+  gnugrep,
+  rsync,
+  gnused,
+  gawk,
+  findutils,
+  closureInfo,
+  ...
 }:
 
 # Produces a flatpak source layout (manifest YAML + source tarball + helper
@@ -18,12 +29,24 @@
 # `./build.sh` on a flatpak-enabled host to materialise the `.flatpak`.
 
 let
+  deps = import ../deps.nix {
+    inherit
+      lib
+      utils
+      closureInfo
+      coreutils
+      file
+      gawk
+      gnugrep
+      gnused
+      patchelf
+      rsync
+      ;
+  };
   common = import ./_common-linux.nix {
     inherit
-      pkgs
       lib
       deps
-      utils
       desktop
       services
       ;
@@ -89,10 +112,10 @@ let
     echo "Built: $here/$OUTPUT"
   '';
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = "${meta.name}-${meta.version}-flatpak-source";
   dontUnpack = true;
-  nativeBuildInputs = with pkgs; [
+  nativeBuildInputs = [
     gnutar
     gzip
     coreutils
@@ -116,11 +139,15 @@ pkgs.stdenv.mkDerivation {
     }}
 
     mkdir -p $out
-    ( cd "$stage" && ${pkgs.gnutar}/bin/tar --owner=0 --group=0 --sort=name \
+    ( cd "$stage" && ${gnutar}/bin/tar --owner=0 --group=0 --sort=name \
         -czf "$out/${tarName}" . )
 
-    cp ${pkgs.writeText "${appId}.yaml" manifestYaml} "$out/${appId}.yaml"
-    cp ${pkgs.writeShellScript "build.sh" buildScript} "$out/build.sh"
+    cat > "$out/${appId}.yaml" <<'MANIFEST_EOF'
+    ${manifestYaml}
+    MANIFEST_EOF
+    cat > "$out/build.sh" <<'BUILD_SH_EOF'
+    ${buildScript}
+    BUILD_SH_EOF
     chmod +x "$out/build.sh"
 
     ${signing.emitSignScript {

@@ -1,4 +1,4 @@
-{ pkgs, lib }:
+{ lib }:
 
 # Codesigning helpers. Bundles ship unsigned out of the Nix sandbox (secrets
 # can't safely live in /nix/store). When `info.signing.<os>.enable = true`,
@@ -237,52 +237,54 @@ let
       if l.enable then gpgScript l artifactGlob else null
     else
       null;
-  # Builds a flake `app` that:
+  # Builds a runnable derivation that:
   #   1. Stages a fresh copy of the unsigned bundle into a temp dir (or $1)
   #   2. Runs `sign.sh` (which reads secrets from the caller's env vars)
   #   3. Prints the path to the signed bundle on stdout
-  # Caller wires it into their flake as `apps.<name> = bundler.signedApp { bundle; }`
-  # and runs `GPG_KEY_ID=… nix run .#<name> -- ./dist` to produce a signed bundle
-  # without touching `result/sign.sh` manually. The underlying `bundle` derivation
-  # stays pure + cacheable.
+  # `nix-build -A <name> && GPG_KEY_ID=… ./result/bin/<name> -- ./dist`
+  # produces a signed bundle without touching `result/sign.sh` manually. The
+  # underlying `bundle` derivation stays pure + cacheable.
+  #
+  # Curried on its own tool deps (rather than this whole file taking `pkgs`)
+  # so callers dispatch it with a single `callPackage signing.signedApp {}` —
+  # one callPackage call per derivation, right where it's actually built.
   signedApp =
+    {
+      writeShellApplication,
+      coreutils,
+      bash,
+    }:
     {
       bundle,
       name ? "${baseNameOf bundle.name}-sign",
     }:
-    let
-      script = pkgs.writeShellApplication {
-        inherit name;
-        runtimeInputs = with pkgs; [
-          coreutils
-          bash
-        ];
-        text = ''
-          set -euo pipefail
-          bundle=${bundle}
-          if [ "$#" -ge 1 ]; then
-            target=$1
-            mkdir -p "$target"
-          else
-            target=$(mktemp -d -t "${name}-XXXX")
-          fi
-          cp -r --no-preserve=mode,ownership "$bundle"/. "$target"/
-          chmod -R u+w "$target"
-          if [ -x "$target/sign.sh" ]; then
-            ( cd "$target" && bash ./sign.sh )
-            rm -f "$target/sign.sh"
-            echo
-            echo "Signed bundle ready at: $target"
-          else
-            echo "warning: $bundle has no sign.sh (info.signing.<os>.enable not set)" >&2
-            echo "Bundle copied unmodified to: $target"
-          fi
-        '';
-      };
-    in
-    {
-      type = "app";
-      program = "${script}/bin/${name}";
+    writeShellApplication {
+      inherit name;
+      runtimeInputs = [
+        coreutils
+        bash
+      ];
+      text = ''
+        set -euo pipefail
+        bundle=${bundle}
+        if [ "$#" -ge 1 ]; then
+          target=$1
+          mkdir -p "$target"
+        else
+          target=$(mktemp -d -t "${name}-XXXX")
+        fi
+        cp -r --no-preserve=mode,ownership "$bundle"/. "$target"/
+        chmod -R u+w "$target"
+        if [ -x "$target/sign.sh" ]; then
+          ( cd "$target" && bash ./sign.sh )
+          rm -f "$target/sign.sh"
+          echo
+          echo "Signed bundle ready at: $target"
+        else
+          echo "warning: $bundle has no sign.sh (info.signing.<os>.enable not set)" >&2
+          echo "Bundle copied unmodified to: $target"
+        fi
+      '';
     };
 in
 {

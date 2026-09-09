@@ -11,10 +11,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Two hosts because neither can cover every format alone: `rpm`/`nsis`
+  # need to genuinely run on x86_64-linux, and `app`/`pkg`/`productbuild`/
+  # `brew`/darwin services need a genuine darwin binary, which nixpkgs can't
+  # cross-compile from linux. `tests/` skips whichever half a given host
+  # can't produce (`canRpm`/`canNsis`/an `isDarwin` check); between the two
+  # matrix legs, every format gets built somewhere.
   check:
-    name: nix flake check + lints
-    runs-on: ubuntu-latest
+    name: build tests + lints (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v7
 
@@ -26,12 +35,14 @@ jobs:
             accept-flake-config = true
 
       - name: nixfmt --check
+        if: matrix.os == 'ubuntu-latest'
         run: |
           mapfile -t files < <(git ls-files '*.nix')
           if [ "${#files[@]}" -eq 0 ]; then exit 0; fi
           nix run nixpkgs#nixfmt-rfc-style -- --check "${files[@]}"
 
       - name: deadnix
+        if: matrix.os == 'ubuntu-latest'
         run: nix run nixpkgs#deadnix -- --fail .
 
       - name: nix flake check (evaluation gate)

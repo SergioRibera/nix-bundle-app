@@ -1,5 +1,4 @@
 {
-  pkgs,
   lib,
   deps,
   desktop,
@@ -14,22 +13,25 @@ let
     meta: destDir:
     let
       rendered = systemdRenderedUnits meta;
+      writeOne = i: u: ''
+        cat > "${destDir}/${u.filename}" <<'UNIT_${toString i}_EOF'
+        ${u.content}
+        UNIT_${toString i}_EOF
+        chmod 644 "${destDir}/${u.filename}"
+      '';
     in
     lib.optionalString (rendered != [ ]) ''
       mkdir -p "${destDir}"
-      ${lib.concatMapStringsSep "\n" (u: ''
-        cp ${pkgs.writeText u.filename u.content} "${destDir}/${u.filename}"
-        chmod 644 "${destDir}/${u.filename}"
-      '') rendered}
+      ${lib.concatStrings (lib.imap1 writeOne rendered)}
     '';
 
   writeDesktopEntries =
     meta: stage:
-    lib.optionalString (meta.desktopEntries != [ ]) ''
-      mkdir -p "${stage}/usr/share/applications"
-      ${lib.concatMapStringsSep "\n" (e: ''
-        cp ${pkgs.writeText e.filename e.content} \
-           "${stage}/usr/share/applications/${e.filename}"
+    let
+      writeOne = i: e: ''
+        cat > "${stage}/usr/share/applications/${e.filename}" <<'DESKTOP_${toString i}_EOF'
+        ${e.content}
+        DESKTOP_${toString i}_EOF
         chmod 644 "${stage}/usr/share/applications/${e.filename}"
         ${lib.optionalString (e.iconPath != null) ''
           mkdir -p "${stage}/usr/share/icons/hicolor/512x512/apps"
@@ -38,41 +40,50 @@ let
                if e.iconName != null then e.iconName else e.name
              }.png" || true
         ''}
-      '') (map desktop.renderEntry meta.desktopEntries)}
+      '';
+    in
+    lib.optionalString (meta.desktopEntries != [ ]) ''
+      mkdir -p "${stage}/usr/share/applications"
+      ${lib.concatStrings (lib.imap1 writeOne (map desktop.renderEntry meta.desktopEntries))}
     '';
 
   # Materialise meta.extraFiles into the staged tree. Each entry is
-  # `<absolute dest path> = <Nix path | inline string>`. Inline strings
-  # become a `pkgs.writeText` whose basename mirrors the destination's
-  # so debug listings (`dpkg -c`, `rpm -qlp`) stay readable.
+  # `<absolute dest path> = <Nix path | inline string>`. Inline strings are
+  # heredoc'd directly to the destination; anything else (Nix path, store
+  # path, derivation) coerces via interpolation in the `cp -L` branch below
+  # — distinguishing on `isString` (rather than `isPath`) keeps
+  # derivation-typed values out of the heredoc path, since interpolating a
+  # derivation there would just paste its store path as text, not its
+  # contents.
   writeExtraFiles =
     meta: stage:
     let
       entries = meta.extraFiles or { };
       materialise =
-        dest: src:
-        let
-          # Strings get materialised via writeText; anything else
-          # (Nix path, store path, derivation) coerces via the
-          # interpolation below. Distinguishing on `isString`
-          # (rather than `isPath`) keeps derivation-typed values
-          # like `pkgs.writeText ...` out of the writeText path,
-          # which would otherwise emit a deprecation warning.
-          srcFile = if builtins.isString src then pkgs.writeText (baseNameOf dest) src else src;
-        in
-        # `${srcFile}` (no `toString`) is what forces Nix to copy a
-        # raw filesystem path into the store AND register it as a
-        # derivation input. Using `toString` returned the filesystem
-        # path verbatim, which the sandboxed builder couldn't see —
-        # `cp` would fail with `No such file or directory`.
-        ''
-          mkdir -p "$(dirname "${stage}${dest}")"
-          cp -L "${srcFile}" "${stage}${dest}"
-          chmod 644 "${stage}${dest}"
-        '';
+        i:
+        { name, value }:
+        # `${value}` (no `toString`) is what forces Nix to copy a raw
+        # filesystem path into the store AND register it as a derivation
+        # input, for the non-string branch. Using `toString` returned the
+        # filesystem path verbatim, which the sandboxed builder couldn't
+        # see — `cp` would fail with `No such file or directory`.
+        if builtins.isString value then
+          ''
+            mkdir -p "$(dirname "${stage}${name}")"
+            cat > "${stage}${name}" <<'EXTRAFILE_${toString i}_EOF'
+            ${value}
+            EXTRAFILE_${toString i}_EOF
+            chmod 644 "${stage}${name}"
+          ''
+        else
+          ''
+            mkdir -p "$(dirname "${stage}${name}")"
+            cp -L "${value}" "${stage}${name}"
+            chmod 644 "${stage}${name}"
+          '';
     in
     lib.optionalString (entries != { }) (
-      lib.concatStringsSep "\n" (lib.mapAttrsToList materialise entries)
+      lib.concatStrings (lib.imap1 materialise (lib.attrsToList entries))
     );
 
   # True iff any meta.extraFiles destination lands under a known
@@ -112,6 +123,11 @@ let
       ${deps.copyResources drv "$base/share"}
 
       chmod -R u+w "$base"
+
+      ${deps.verifyStagedBinaries {
+        binDir = "$base/bin";
+        inherit target;
+      }}
 
       ${deps.patchLinuxBinaries {
         binDir = "$base/bin";

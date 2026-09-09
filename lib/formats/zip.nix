@@ -1,14 +1,38 @@
 {
-  pkgs,
-  deps,
+  stdenv,
+  lib,
+  utils,
   drv,
   format,
   meta,
   target,
+  zip,
+  rsync,
+  coreutils,
+  patchelf,
+  file,
+  gnugrep,
+  gawk,
+  gnused,
+  closureInfo,
   ...
 }:
 
 let
+  deps = import ../deps.nix {
+    inherit
+      lib
+      utils
+      closureInfo
+      coreutils
+      file
+      gawk
+      gnugrep
+      gnused
+      patchelf
+      rsync
+      ;
+  };
   isWindows = target.os == "windows";
   isDarwin = target.os == "darwin";
   outFile = "${meta.name}-${meta.version}-${target.arch}-${target.os}.zip";
@@ -19,8 +43,12 @@ let
     ${deps.copyBinaries drv "$stage"}
     ${deps.copyWindowsDlls drv "$stage"}
     if [ -d "${drv}/share" ]; then
-      ${pkgs.rsync}/bin/rsync -a --copy-links "${drv}/share/" "$stage/share/" || true
+      ${rsync}/bin/rsync -a --copy-links "${drv}/share/" "$stage/share/" || true
     fi
+    ${deps.verifyStagedBinaries {
+      binDir = "$stage";
+      inherit target;
+    }}
   '';
 
   darwinPrep = ''
@@ -29,8 +57,12 @@ let
     ${deps.copyBinaries drv "$stage/bin"}
     ${deps.copyDarwinLibs drv "$stage/lib"}
     if [ -d "${drv}/share" ]; then
-      ${pkgs.rsync}/bin/rsync -a --copy-links "${drv}/share/" "$stage/share/" || true
+      ${rsync}/bin/rsync -a --copy-links "${drv}/share/" "$stage/share/" || true
     fi
+    ${deps.verifyStagedBinaries {
+      binDir = "$stage/bin";
+      inherit target;
+    }}
   '';
 
   linuxPrep = ''
@@ -39,8 +71,12 @@ let
     ${deps.copyBinaries drv "$stage/bin"}
     ${deps.copyLinuxLibs drv "$stage/lib"}
     if [ -d "${drv}/share" ]; then
-      ${pkgs.rsync}/bin/rsync -a --copy-links "${drv}/share/" "$stage/share/" || true
+      ${rsync}/bin/rsync -a --copy-links "${drv}/share/" "$stage/share/" || true
     fi
+    ${deps.verifyStagedBinaries {
+      binDir = "$stage/bin";
+      inherit target;
+    }}
   '';
 
   prep =
@@ -51,22 +87,22 @@ let
     else
       linuxPrep;
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = outFile;
   dontUnpack = true;
   nativeBuildInputs = [
-    pkgs.zip
-    pkgs.rsync
-    pkgs.coreutils
-    pkgs.patchelf
-    pkgs.file
-    pkgs.gnugrep
+    zip
+    rsync
+    coreutils
+    patchelf
+    file
+    gnugrep
   ];
 
   buildCommand = ''
     ${prep}
     mkdir -p $out
-    ( cd "$PWD" && ${pkgs.zip}/bin/zip -r -9 "$out/${outFile}" "${meta.name}-${meta.version}" )
+    ( cd "$PWD" && ${zip}/bin/zip -r -9 "$out/${outFile}" "${meta.name}-${meta.version}" )
   '';
 
   passthru = {
