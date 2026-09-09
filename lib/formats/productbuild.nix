@@ -113,55 +113,85 @@ let
       cp "${path}" "Resources/${filenameFor key path}"
     '';
 in
-pkgs.stdenv.mkDerivation {
-  name = outFile;
-  dontUnpack = true;
-  nativeBuildInputs = [
-    pkgs.coreutils
-    pkgs.gnused
-    pkgs.xar
-  ];
+pkgs.stdenv.mkDerivation (
+  {
+    name = outFile;
+    dontUnpack = true;
+    nativeBuildInputs = [
+      pkgs.coreutils
+      pkgs.gnused
+      pkgs.xar
+    ];
+  }
+  // lib.optionalAttrs pkgs.stdenv.isDarwin {
+    __impureHostDeps = [
+      "/usr/bin/productbuild"
+      "/usr/bin/pkgbuild"
+      "/System/Library/PrivateFrameworks/PackageKit.framework"
+      "/System/Library/Frameworks/CoreFoundation.framework"
+      "/System/Library/Frameworks/Security.framework"
+    ];
+    preferLocalBuild = true;
+    allowSubstitutes = false;
+  }
+  // {
 
-  buildCommand =
-    let
-      stageInner = ''
-        work=$PWD/dist
-        mkdir -p "$work/Resources"
-        cp ${inner}/${innerFile} "$work/${innerFile}"
-        chmod u+w "$work/${innerFile}"
+    buildCommand =
+      let
+        stageInner = ''
+          work=$PWD/dist
+          mkdir -p "$work/Resources"
+          cp ${inner}/${innerFile} "$work/${innerFile}"
+          chmod u+w "$work/${innerFile}"
 
-        cd "$work"
-        ${copyResource "welcome"}
-        ${copyResource "license"}
-        ${copyResource "readme"}
-        ${copyResource "conclusion"}
-        ${copyResource "background"}
+          cd "$work"
+          ${copyResource "welcome"}
+          ${copyResource "license"}
+          ${copyResource "readme"}
+          ${copyResource "conclusion"}
+          ${copyResource "background"}
 
-        cp ${pkgs.writeText "Distribution" distributionXml} Distribution
-        chmod u+w Distribution
-        ${pkgs.gnused}/bin/sed -i 's/^    //' Distribution
-      '';
+          cp ${pkgs.writeText "Distribution" distributionXml} Distribution
+          chmod u+w Distribution
+          ${pkgs.gnused}/bin/sed -i 's/^    //' Distribution
+        '';
 
-      linuxBuild = ''
-        ${stageInner}
-        mkdir -p $out
-        # productbuild on darwin would do this; on linux we hand-assemble the
-        # outer xar. Distribution xml + Resources/ + component pkg side by side
-        # is what the Installer.app expects.
-        xar --compression none -cf "$out/${outFile}" \
-          Distribution Resources ${innerFile}
-      '';
+        linuxBuild = ''
+          ${stageInner}
+          mkdir -p $out
+          # Hand-assembled distribution xar (linux cross-build path). Real
+          # productbuild sets a bunch of xar metadata + gzip compression that
+          # Apple's `installer` inspects — hitting the system tool below when
+          # we build on macOS avoids "Installer can't locate the data" errors.
+          xar --compression none -cf "$out/${outFile}" \
+            Distribution Resources ${innerFile}
+        '';
 
-    in
-    linuxBuild
-    + signing.emitSignScript {
-      inherit meta format;
-      artifactGlob = "*-install.pkg";
+        darwinBuild = ''
+          ${stageInner}
+          mkdir -p $out
+          if [ -x /usr/bin/productbuild ]; then
+            /usr/bin/productbuild \
+              --distribution Distribution \
+              --resources Resources \
+              --package-path . \
+              "$out/${outFile}"
+          else
+            xar --compression none -cf "$out/${outFile}" \
+              Distribution Resources ${innerFile}
+          fi
+        '';
+      in
+      (if pkgs.stdenv.isDarwin then darwinBuild else linuxBuild)
+      + signing.emitSignScript {
+        inherit meta format;
+        artifactGlob = "*-install.pkg";
+      };
+
+    passthru = {
+      info = meta;
+      inherit target format outFile;
+      componentPkg = inner;
     };
-
-  passthru = {
-    info = meta;
-    inherit target format outFile;
-    componentPkg = inner;
-  };
-}
+  }
+)
