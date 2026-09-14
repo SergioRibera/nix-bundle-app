@@ -144,10 +144,15 @@ let
 
   hasServices = meta: meta.services != [ ];
 
+  # Only emit systemctl blocks when there is at least one enabled service
+  # to act on — otherwise the `if … then <empty> fi` shell body is a
+  # syntax error under dash (Debian's /bin/sh).
+  hasEnabledServices = meta: enabledServiceNames meta != [ ];
+
   postinstSnippet =
     meta:
     lib.concatStrings [
-      (lib.optionalString (hasServices meta) ''
+      (lib.optionalString (hasEnabledServices meta) ''
         if command -v systemctl >/dev/null 2>&1; then
           systemctl daemon-reload || true
           ${lib.concatMapStringsSep "\n  " (
@@ -160,7 +165,7 @@ let
 
   prermSnippet =
     meta:
-    lib.optionalString (hasServices meta) ''
+    lib.optionalString (hasEnabledServices meta) ''
       if command -v systemctl >/dev/null 2>&1; then
         ${lib.concatMapStringsSep "\n  " (n: ''
           systemctl stop "${n}.service" 2>/dev/null || true
