@@ -4,21 +4,20 @@
 }:
 
 let
+  inherit (pkgs) lib;
+  isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
+
   # Each drv genuinely targets its name (native when the host already
   # matches, cross-compiled otherwise) since not every bundle below passes
-  # an explicit `target`.
+  # an explicit `target`. Darwin bundles are gated on an `isDarwin` host:
+  # cross-compiling hello to darwin from linux drags in cctools, which
+  # only evaluates on an aarch64-darwin host.
   helloLinux =
     if pkgs.stdenv.hostPlatform.system == "x86_64-linux" then
       pkgs.hello
     else
       pkgs.pkgsCross.gnu64.hello;
   helloWindows = pkgs.pkgsCross.mingwW64.hello;
-  # Cross-building hello to darwin from linux pulls cctools, which only
-  # evaluates on an aarch64-darwin host — unusable on CI's x86_64-linux
-  # runner. Fall back to the linux build so darwin bundle *shape* still
-  # gets exercised cross-platform; darwin-native CI picks the real
-  # darwin build via the branch above.
-  helloDarwin = if pkgs.stdenv.hostPlatform.isDarwin then pkgs.hello else helloLinux;
 
   commonInfo = {
     description = "GNU Hello, the canonical example program";
@@ -139,38 +138,6 @@ in
     info = commonInfo;
   };
 
-  hello-app = bundler.bundle {
-    drv = helloDarwin;
-    format = "app";
-    info = commonInfo;
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-  };
-
-  hello-brew = bundler.bundle {
-    drv = helloDarwin;
-    format = "brew";
-    info = commonInfo // {
-      downloadUrl = "https://example.com/releases/hello.tar.gz";
-    };
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-  };
-
-  hello-dmg = bundler.bundle {
-    drv = helloDarwin;
-    format = "dmg";
-    info = commonInfo;
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-  };
-
   hello-nsis = bundler.bundle {
     drv = helloWindows;
     format = "nsis";
@@ -222,34 +189,6 @@ in
     };
   };
 
-  hello-pkg = bundler.bundle {
-    drv = helloDarwin;
-    format = "pkg";
-    info = commonInfo;
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-  };
-
-  hello-productbuild = bundler.bundle {
-    drv = helloDarwin;
-    format = "productbuild";
-    info = commonInfo // {
-      productbuild = {
-        title = "Hello Installer";
-        organization = "com.example";
-        welcome = pkgs.writeText "welcome.html" "<html><body><h1>Hello</h1></body></html>";
-        license = pkgs.writeText "license.txt" "MIT.";
-        conclusion = pkgs.writeText "conclusion.html" "<html><body>Installed.</body></html>";
-      };
-    };
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-  };
-
   hello-msi = bundler.bundle {
     drv = helloWindows;
     format = "msi";
@@ -288,22 +227,6 @@ in
     };
   };
 
-  hello-all-darwin = bundler.bundleAll {
-    drv = helloDarwin;
-    formats = [
-      "app"
-      "dmg"
-      "pkg"
-      "brew"
-      "tar.gz"
-    ];
-    info = commonInfo;
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-  };
-
   hello-service-deb = bundler.bundle {
     drv = helloLinux;
     format = "deb";
@@ -320,24 +243,6 @@ in
     info = serviceInfo;
   };
   # Intentionally no `hello-service-appimage`: schema asserts AppImage+services.
-  hello-service-app = bundler.bundle {
-    drv = helloDarwin;
-    format = "app";
-    info = serviceInfo;
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-  };
-  hello-service-pkg = bundler.bundle {
-    drv = helloDarwin;
-    format = "pkg";
-    info = serviceInfo;
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-  };
   hello-service-nsis = bundler.bundle {
     drv = helloWindows;
     format = "nsis";
@@ -369,16 +274,18 @@ in
           "rpm"
         ];
       };
-      "x86_64-darwin" = {
-        drv = helloDarwin;
-        formats = [ "tar.gz" ];
-      };
       "x86_64-windows" = {
         drv = helloWindows;
         formats = [
           "zip"
           "msi"
         ];
+      };
+    }
+    // lib.optionalAttrs isDarwin {
+      "x86_64-darwin" = {
+        drv = pkgs.hello;
+        formats = [ "tar.gz" ];
       };
     };
   };
@@ -395,3 +302,84 @@ in
     };
   };
 }
+// lib.optionalAttrs isDarwin (
+  let
+    darwinTarget = {
+      arch = "x86_64";
+      os = "darwin";
+    };
+  in
+  {
+    hello-app = bundler.bundle {
+      drv = pkgs.hello;
+      format = "app";
+      info = commonInfo;
+      target = darwinTarget;
+    };
+
+    hello-brew = bundler.bundle {
+      drv = pkgs.hello;
+      format = "brew";
+      info = commonInfo // {
+        downloadUrl = "https://example.com/releases/hello.tar.gz";
+      };
+      target = darwinTarget;
+    };
+
+    hello-dmg = bundler.bundle {
+      drv = pkgs.hello;
+      format = "dmg";
+      info = commonInfo;
+      target = darwinTarget;
+    };
+
+    hello-pkg = bundler.bundle {
+      drv = pkgs.hello;
+      format = "pkg";
+      info = commonInfo;
+      target = darwinTarget;
+    };
+
+    hello-productbuild = bundler.bundle {
+      drv = pkgs.hello;
+      format = "productbuild";
+      info = commonInfo // {
+        productbuild = {
+          title = "Hello Installer";
+          organization = "com.example";
+          welcome = pkgs.writeText "welcome.html" "<html><body><h1>Hello</h1></body></html>";
+          license = pkgs.writeText "license.txt" "MIT.";
+          conclusion = pkgs.writeText "conclusion.html" "<html><body>Installed.</body></html>";
+        };
+      };
+      target = darwinTarget;
+    };
+
+    hello-all-darwin = bundler.bundleAll {
+      drv = pkgs.hello;
+      formats = [
+        "app"
+        "dmg"
+        "pkg"
+        "brew"
+        "tar.gz"
+      ];
+      info = commonInfo;
+      target = darwinTarget;
+    };
+
+    hello-service-app = bundler.bundle {
+      drv = pkgs.hello;
+      format = "app";
+      info = serviceInfo;
+      target = darwinTarget;
+    };
+
+    hello-service-pkg = bundler.bundle {
+      drv = pkgs.hello;
+      format = "pkg";
+      info = serviceInfo;
+      target = darwinTarget;
+    };
+  }
+)

@@ -64,16 +64,11 @@ jobs:
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: bundle-appimage }
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: bundle-tar-gz }
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: bundle-zip }
-          - { runs-on: ubuntu-latest, system: x86_64-linux, check: bundle-app }
-          - { runs-on: ubuntu-latest, system: x86_64-linux, check: bundle-brew }
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: bundle-brew-linux }
-          - { runs-on: ubuntu-latest, system: x86_64-linux, check: bundle-pkg }
-          - { runs-on: ubuntu-latest, system: x86_64-linux, check: bundle-productbuild }
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: bundle-nsis }
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: bundle-msi }
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: bundle-service-deb }
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: bundle-service-nsis }
-          - { runs-on: ubuntu-latest, system: x86_64-linux, check: bundle-service-pkg }
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: bundle-extra-files-deb }
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: bundle-extra-files-rpm }
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: bundle-extra-files-archlinux }
@@ -85,13 +80,21 @@ jobs:
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: rust-snap }
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: rust-tar-gz }
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: rust-zip }
-          - { runs-on: ubuntu-latest, system: x86_64-linux, check: rust-app }
-          - { runs-on: ubuntu-latest, system: x86_64-linux, check: rust-brew }
-          - { runs-on: ubuntu-latest, system: x86_64-linux, check: rust-pkg }
-          - { runs-on: ubuntu-latest, system: x86_64-linux, check: rust-productbuild }
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: rust-nsis }
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: rust-msi }
           - { runs-on: ubuntu-latest, system: x86_64-linux, check: rust-windows-zip }
+          # darwin checks run only on a real darwin host — cross-building the
+          # bundler's darwin binaries from linux pulls cctools, which only
+          # evaluates on darwin, so we don't attempt it in CI.
+          - { runs-on: macos-latest,  system: aarch64-darwin, check: bundle-app }
+          - { runs-on: macos-latest,  system: aarch64-darwin, check: bundle-brew }
+          - { runs-on: macos-latest,  system: aarch64-darwin, check: bundle-pkg }
+          - { runs-on: macos-latest,  system: aarch64-darwin, check: bundle-productbuild }
+          - { runs-on: macos-latest,  system: aarch64-darwin, check: bundle-service-pkg }
+          - { runs-on: macos-latest,  system: aarch64-darwin, check: rust-app }
+          - { runs-on: macos-latest,  system: aarch64-darwin, check: rust-brew }
+          - { runs-on: macos-latest,  system: aarch64-darwin, check: rust-pkg }
+          - { runs-on: macos-latest,  system: aarch64-darwin, check: rust-productbuild }
     steps:
       - uses: actions/checkout@v7
 
@@ -128,12 +131,9 @@ jobs:
           - { group: windows,        attr: hello-nsis,          runs-on: ubuntu-latest }
           - { group: windows,        attr: hello-msi,           runs-on: ubuntu-latest }
           - { group: windows,        attr: hello-windows-zip,   runs-on: ubuntu-latest }
-          # ---- darwin (cross from linux) ------------------------------------
-          - { group: darwin-cross,   attr: hello-app,           runs-on: ubuntu-latest }
-          - { group: darwin-cross,   attr: hello-brew,          runs-on: ubuntu-latest }
-          - { group: darwin-cross,   attr: hello-dmg,           runs-on: ubuntu-latest }
-          - { group: darwin-cross,   attr: hello-pkg,           runs-on: ubuntu-latest }
-          - { group: darwin-cross,   attr: hello-productbuild,  runs-on: ubuntu-latest }
+          # ---- darwin (native macos runner only; cross from linux is a lie:
+          #      cctools evaluates only on darwin hosts, so linux produces a
+          #      linux binary wrapped in a .pkg/.app, not a usable artifact)
           # ---- darwin (native macos runner) ---------------------------------
           - { group: darwin-native,  attr: hello-app,           runs-on: macos-latest }
           - { group: darwin-native,  attr: hello-brew,          runs-on: macos-latest }
