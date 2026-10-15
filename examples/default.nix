@@ -13,11 +13,12 @@ let
     else
       pkgs.pkgsCross.gnu64.hello;
   helloWindows = pkgs.pkgsCross.mingwW64.hello;
-  helloDarwin =
-    if pkgs.stdenv.hostPlatform.system == "x86_64-darwin" then
-      pkgs.hello
-    else
-      pkgs.pkgsCross.x86_64-darwin.hello;
+  # Cross-building hello to darwin from linux pulls cctools, which only
+  # evaluates on an aarch64-darwin host — unusable on CI's x86_64-linux
+  # runner. Fall back to the linux build so darwin bundle *shape* still
+  # gets exercised cross-platform; darwin-native CI picks the real
+  # darwin build via the branch above.
+  helloDarwin = if pkgs.stdenv.hostPlatform.isDarwin then pkgs.hello else helloLinux;
 
   commonInfo = {
     description = "GNU Hello, the canonical example program";

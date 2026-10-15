@@ -70,8 +70,10 @@ stdenv.mkDerivation {
     gnused
     gzip
     cpio
-    # For the manual flat-pkg fallback below (`pkgbuild` is never on the
-    # sandboxed build PATH, even on darwin).
+    # xar + bomutils on every host so we never fall through to the tar-gzip
+    # fallback that Apple's `installer` refuses ("invalid package path").
+    # `pkgbuild` is never on the sandboxed build PATH, even on darwin, so
+    # we always build the flat pkg by hand.
     bomutils
     xar
   ];
@@ -144,33 +146,8 @@ stdenv.mkDerivation {
             PackageInfo Bom Payload ${lib.optionalString hasServices "Scripts"} )
       '';
 
-      pkgbuildBuild = ''
-        ${stageRoot}
-        mkdir -p $out
-        ${lib.optionalString hasServices ''
-          mkdir -p scripts
-          cat > scripts/postinstall <<'PKGBUILD_POSTINSTALL_EOF'
-          ${postinstallText}
-          PKGBUILD_POSTINSTALL_EOF
-          chmod 755 scripts/postinstall
-        ''}
-        pkgbuild \
-          --root "$root" \
-          --identifier "${meta.bundleId}" \
-          --version "${meta.version}" \
-          --install-location ${installLocation} \
-          ${lib.optionalString hasServices "--scripts scripts"} \
-          "$out/${outFile}"
-      '';
     in
-    ''
-      if command -v pkgbuild >/dev/null 2>&1; then
-        ${pkgbuildBuild}
-      else
-        echo "pkgbuild not on PATH; falling back to manual flat pkg" >&2
-        ${manualFlatPkgBuild}
-      fi
-    ''
+    manualFlatPkgBuild
     + signing.emitSignScript {
       inherit meta format;
       artifactGlob = "*.pkg";

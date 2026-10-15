@@ -87,6 +87,7 @@ stdenv.mkDerivation {
           inherit target;
         }}
 
+        ${deps.patchDarwinLibs "$appdir/Contents/Frameworks"}
         ${deps.patchDarwinBinaries "$appdir/Contents/MacOS"}
 
         ${lib.optionalString (meta.macOsIcon != null) ''

@@ -29,7 +29,7 @@ let
         parts = lib.splitString "." meta.bundleId;
         n = builtins.length parts;
       in
-      if n >= 2 then lib.concatStringsSep "." (lib.sublist 0 (n - 1) parts) else meta.bundleId;
+      if n >= 2 then builtins.elemAt parts (n - 2) else meta.bundleId;
 
   resourceRefs = {
     welcome = pb.welcome;
@@ -38,42 +38,36 @@ let
     conclusion = pb.conclusion;
     background = pb.background;
   };
-  # Strip the store hash, keep the trailing extension. The Resources/ filename
-  # ends up as `welcome.html` instead of `welcome-<hash>-welcome.html`.
-  extensionOf =
-    path:
+
+  filenameFor =
+    key: path:
     let
-      m = builtins.match ".*(\\.[^./]+)$" (baseNameOf (toString path));
+      base = builtins.baseNameOf (toString path);
+      ext = lib.toLower (lib.lists.last (lib.splitString "." base));
     in
-    if m == null then "" else builtins.head m;
-  filenameFor = key: path: "${key}${extensionOf path}";
-
-  screenRef =
-    tag: key:
-    let
-      path = resourceRefs.${key};
-    in
-    if path == null then "" else "<${tag} file=\"${esc (filenameFor key path)}\"/>";
-
-  bgRef =
-    if pb.background == null then
-      ""
-    else
-      "<background file=\"${esc (filenameFor "background" pb.background)}\" alignment=\"center\" scaling=\"proportional\"/>";
-
-  customize = if pb.allowCustomize then "always" else "never";
+    "${key}.${ext}";
 
   distributionXml = ''
     <?xml version="1.0" encoding="utf-8"?>
-    <installer-gui-script minSpecVersion="2">
+    <installer-gui-script minSpecVersion="1">
       <title>${esc title}</title>
       <organization>${esc organization}</organization>
-      <options customize="${customize}" require-scripts="false" rootVolumeOnly="true"/>
-      ${screenRef "welcome" "welcome"}
-      ${screenRef "license" "license"}
-      ${screenRef "readme" "readme"}
-      ${screenRef "conclusion" "conclusion"}
-      ${bgRef}
+      ${lib.optionalString (
+        resourceRefs.welcome != null
+      ) ''<welcome file="${esc (filenameFor "welcome" resourceRefs.welcome)}" mime-type="text/plain"/>''}
+      ${lib.optionalString (
+        resourceRefs.license != null
+      ) ''<license file="${esc (filenameFor "license" resourceRefs.license)}" mime-type="text/plain"/>''}
+      ${lib.optionalString (
+        resourceRefs.readme != null
+      ) ''<readme file="${esc (filenameFor "readme" resourceRefs.readme)}" mime-type="text/plain"/>''}
+      ${lib.optionalString (resourceRefs.conclusion != null)
+        ''<conclusion file="${esc (filenameFor "conclusion" resourceRefs.conclusion)}" mime-type="text/plain"/>''
+      }
+      ${lib.optionalString (resourceRefs.background != null)
+        ''<background file="${esc (filenameFor "background" resourceRefs.background)}" alignment="topleft" scaling="none"/>''
+      }
+      <options customize="never" require-scripts="false" allow-external-scripts="no"/>
       <choices-outline>
         <line choice="default">
           <line choice="${esc meta.bundleId}"/>
@@ -96,74 +90,91 @@ let
       cp "${path}" "Resources/${filenameFor key path}"
     '';
 in
-stdenv.mkDerivation {
-  name = outFile;
-  dontUnpack = true;
-  nativeBuildInputs = [
-    coreutils
-    gnused
-    xar
-  ];
+stdenv.mkDerivation (
+  {
+    name = outFile;
+    dontUnpack = true;
+    nativeBuildInputs = [
+      coreutils
+      gnused
+      xar
+    ];
+  }
+  // lib.optionalAttrs stdenv.isDarwin {
+    __impureHostDeps = [
+      "/usr/bin/productbuild"
+      "/usr/bin/pkgbuild"
+      "/System/Library/PrivateFrameworks/PackageKit.framework"
+      "/System/Library/Frameworks/CoreFoundation.framework"
+      "/System/Library/Frameworks/Security.framework"
+    ];
+    preferLocalBuild = true;
+    allowSubstitutes = false;
+  }
+  // {
 
-  buildCommand =
-    let
-      stageInner = ''
-        work=$PWD/dist
-        mkdir -p "$work/Resources"
-        cp ${componentPkg}/${innerFile} "$work/${innerFile}"
-        chmod u+w "$work/${innerFile}"
+    buildCommand =
+      let
+        stageInner = ''
+          work=$PWD/dist
+          mkdir -p "$work/Resources"
+          cp ${componentPkg}/${innerFile} "$work/${innerFile}"
+          chmod u+w "$work/${innerFile}"
 
-        cd "$work"
-        ${copyResource "welcome"}
-        ${copyResource "license"}
-        ${copyResource "readme"}
-        ${copyResource "conclusion"}
-        ${copyResource "background"}
+          cd "$work"
+          ${copyResource "welcome"}
+          ${copyResource "license"}
+          ${copyResource "readme"}
+          ${copyResource "conclusion"}
+          ${copyResource "background"}
 
-        cat > Distribution <<'DISTRIBUTION_EOF'
-        ${distributionXml}
-        DISTRIBUTION_EOF
-        chmod u+w Distribution
-        ${gnused}/bin/sed -i 's/^    //' Distribution
-      '';
+          cat > Distribution <<'DISTRIBUTION_EOF'
+          ${distributionXml}
+          DISTRIBUTION_EOF
+          chmod u+w Distribution
+          ${gnused}/bin/sed -i 's/^    //' Distribution
+        '';
 
-      # Distribution xml + Resources/ + component pkg side by side is what
-      # the Installer.app expects; `productbuild` assembles that into an
-      # outer xar for us, or we hand-assemble the same thing with `xar`.
-      productbuildBuild = ''
-        productbuild \
-          --distribution Distribution \
-          --resources Resources \
-          --package-path . \
-          "$out/${outFile}"
-      '';
+        # Hand-assembled distribution xar (linux cross-build path). Real
+        # productbuild sets a bunch of xar metadata + gzip compression that
+        # Apple's `installer` inspects — hitting the system tool below when
+        # we build on macOS avoids "Installer can't locate the data" errors.
+        linuxBuild = ''
+          ${stageInner}
+          mkdir -p $out
+          xar --compression none -cf "$out/${outFile}" \
+            Distribution Resources ${innerFile}
+        '';
 
-      xarBuild = ''
-        xar --compression none -cf "$out/${outFile}" \
-          Distribution Resources ${innerFile}
-      '';
-    in
-    ''
-      ${stageInner}
-      mkdir -p $out
-      if command -v productbuild >/dev/null 2>&1; then
-        ${productbuildBuild}
-      else
-        ${xarBuild}
-      fi
-    ''
-    + signing.emitSignScript {
-      inherit meta format;
-      artifactGlob = "*-install.pkg";
+        darwinBuild = ''
+          ${stageInner}
+          mkdir -p $out
+          if [ -x /usr/bin/productbuild ]; then
+            /usr/bin/productbuild \
+              --distribution Distribution \
+              --resources Resources \
+              --package-path . \
+              "$out/${outFile}"
+          else
+            xar --compression none -cf "$out/${outFile}" \
+              Distribution Resources ${innerFile}
+          fi
+        '';
+      in
+      (if stdenv.isDarwin then darwinBuild else linuxBuild)
+      + signing.emitSignScript {
+        inherit meta format;
+        artifactGlob = "*-install.pkg";
+      };
+
+    passthru = {
+      info = meta;
+      inherit
+        target
+        format
+        outFile
+        componentPkg
+        ;
     };
-
-  passthru = {
-    info = meta;
-    inherit
-      target
-      format
-      outFile
-      componentPkg
-      ;
-  };
-}
+  }
+)

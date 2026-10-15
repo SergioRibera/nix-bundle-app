@@ -60,7 +60,7 @@ let
     if hash == null then
       throw "nix-bundle-app: no pinned AppImage runtime hash for arch '${target.arch}'. Supply meta.appImageRuntime."
     else
-      pkgs.fetchurl {
+      fetchurl {
         inherit url hash;
       };
 
@@ -142,6 +142,9 @@ stdenv.mkDerivation {
       ( cd "$AppDir" && ln -sf "${meta.name}.png" .DirIcon )
     fi
 
+    # Must NOT use writeShellScript here: it injects a `/nix/store/...-bash`
+    # shebang that dies on any non-Nix host. AppRun needs the portable
+    # `#!/bin/sh` line already baked into `appRun`.
     cat > "$AppDir/AppRun" <<'APPRUN_EOF'
     ${appRun}
     APPRUN_EOF
