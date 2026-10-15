@@ -63,13 +63,16 @@ in
     target = darwinTarget;
     expect = "${rustName}-${rustVersion}-${darwinArchFile}-install.pkg";
     probeInputs = [ pkgs.xar ];
+    # Native /usr/bin/productbuild unpacks the component pkg into a xar
+    # subdirectory; the linux manual-xar path keeps it as a flat file.
+    # Use `-e` so both shapes pass.
     assertScript = ''
       tmp=$(mktemp -d)
       ( cd "$tmp" && xar -xf "$artifact" )
       test -f "$tmp/Distribution"
       test -f "$tmp/Resources/welcome.html"
       test -f "$tmp/Resources/license.txt"
-      test -f "$tmp/${rustName}-${rustVersion}-${darwinArchFile}.pkg"
+      test -e "$tmp/${rustName}-${rustVersion}-${darwinArchFile}.pkg"
       grep -q "Rust Demo Installer" "$tmp/Distribution"
     '';
   };

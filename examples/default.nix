@@ -6,6 +6,10 @@
 let
   inherit (pkgs) lib;
   isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
+  # Native arch for darwin: aarch64 → arm64 (Apple's Mach-O naming) vs
+  # x86_64. Darwin bundles must declare their target arch to match the
+  # drv's actual arch, otherwise `verifyStagedBinaries` rejects.
+  darwinArch = if pkgs.stdenv.hostPlatform.isAarch64 then "aarch64" else "x86_64";
 
   # Each drv genuinely targets its name (native when the host already
   # matches, cross-compiled otherwise) since not every bundle below passes
@@ -283,7 +287,7 @@ in
       };
     }
     // lib.optionalAttrs isDarwin {
-      "x86_64-darwin" = {
+      "${darwinArch}-darwin" = {
         drv = pkgs.hello;
         formats = [ "tar.gz" ];
       };
@@ -305,7 +309,7 @@ in
 // lib.optionalAttrs isDarwin (
   let
     darwinTarget = {
-      arch = "x86_64";
+      arch = darwinArch;
       os = "darwin";
     };
   in

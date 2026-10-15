@@ -8,7 +8,6 @@
   meta,
   target,
   stdenv,
-  fetchurl,
   squashfsTools,
   coreutils,
   file,
@@ -39,32 +38,25 @@ let
   outFile = "${meta.name}-${meta.version}-${target.arch}.AppImage";
 
   # Runtime is a ~200KB ELF that mounts the appended squashfs and execs AppRun.
-  # AppImage/type2-runtime publishes to a rolling `continuous` release tag, so
-  # the artifact rotates whenever upstream rebuilds. When CI trips a hash
-  # mismatch, refresh via:
-  #   nix-prefetch-url --type sha256 \
-  #     https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-<arch>
-  #   nix hash convert --hash-algo sha256 --to sri <base32>
-  # Downstreams can bypass the pin entirely with
-  # `info.appImageRuntime = pkgs.fetchurl { url=...; hash=...; }`.
-  defaultRuntime =
+  # AppImage/type2-runtime only publishes to a rolling `continuous` release
+  # tag whose assets rotate on every upstream rebuild, so pinning by URL +
+  # hash is unsustainable. Instead the current builds are vendored into
+  # this repo under `vendor/appimage-runtime/`; refresh with
+  # `scripts/update-appimage-runtime.sh` (or by hand via `curl -fsSL
+  # https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-<arch>
+  # -o vendor/appimage-runtime/runtime-<arch>`). Downstreams can still
+  # bypass the vendored binary with `info.appImageRuntime = …` (a path or
+  # a derivation whose outPath is a runnable ELF).
+  vendoredRuntime =
     let
-      url = "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-${target.arch}";
-      hash =
-        {
-          "x86_64" = "sha256-HMSbzx4szVk8N5rbF8n4WjbWGQiCllBN6VsdBiFa678=";
-          "aarch64" = "sha256-fV13K3wy8MhMrwpFKjBypXCQJ9fqxYVv64mnp6iIE3I=";
-        }
-        .${target.arch} or null;
+      path = ../../vendor/appimage-runtime/runtime-${target.arch};
     in
-    if hash == null then
-      throw "nix-bundle-app: no pinned AppImage runtime hash for arch '${target.arch}'. Supply meta.appImageRuntime."
+    if builtins.pathExists path then
+      path
     else
-      fetchurl {
-        inherit url hash;
-      };
+      throw "nix-bundle-app: no vendored AppImage runtime for arch '${target.arch}'. Supply info.appImageRuntime or add vendor/appimage-runtime/runtime-${target.arch}.";
 
-  runtime = if meta.appImageRuntime != null then meta.appImageRuntime else defaultRuntime;
+  runtime = if meta.appImageRuntime != null then meta.appImageRuntime else vendoredRuntime;
 
   # AppImage spec requires exactly one top-level .desktop. Use the first
   # user-supplied entry; otherwise synthesize a minimal one from the
