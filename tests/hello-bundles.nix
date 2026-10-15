@@ -13,6 +13,8 @@ let
     pkgs
     canNsis
     canRpm
+    darwinArchFile
+    darwinTarget
     ;
   inherit (pkgs) lib;
 in
@@ -102,10 +104,7 @@ lib.optionalAttrs canNsis {
     format = "app";
     drv = drvDarwin;
     inherit info;
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
+    target = darwinTarget;
     expect = "hello.app";
   };
 
@@ -114,11 +113,8 @@ lib.optionalAttrs canNsis {
     format = "pkg";
     drv = drvDarwin;
     inherit info;
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-    expect = "hello-*-x86_64.pkg";
+    target = darwinTarget;
+    expect = "hello-*-${darwinArchFile}.pkg";
   };
 
   bundle-productbuild = check {
@@ -131,11 +127,8 @@ lib.optionalAttrs canNsis {
         license = pkgs.writeText "license.txt" "MIT.";
       };
     };
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-    expect = "hello-*-x86_64-install.pkg";
+    target = darwinTarget;
+    expect = "hello-*-${darwinArchFile}-install.pkg";
   };
 
   bundle-brew = check {
@@ -143,10 +136,7 @@ lib.optionalAttrs canNsis {
     format = "brew";
     drv = drvDarwin;
     inherit info;
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
+    target = darwinTarget;
     expect = "hello.rb";
   };
 }

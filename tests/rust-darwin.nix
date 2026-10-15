@@ -12,12 +12,9 @@ let
     rustDarwin
     rustName
     rustVersion
+    darwinArchFile
+    darwinTarget
     ;
-
-  darwinTarget = {
-    arch = "x86_64";
-    os = "darwin";
-  };
 in
 {
   rust-app = e2e {
@@ -41,7 +38,7 @@ in
     drv = rustDarwin;
     info = rustInfo;
     target = darwinTarget;
-    expect = "${rustName}-${rustVersion}-x86_64.pkg";
+    expect = "${rustName}-${rustVersion}-${darwinArchFile}.pkg";
     probeInputs = [ pkgs.xar ];
     assertScript = ''
       tmp=$(mktemp -d)
@@ -64,7 +61,7 @@ in
       };
     };
     target = darwinTarget;
-    expect = "${rustName}-${rustVersion}-x86_64-install.pkg";
+    expect = "${rustName}-${rustVersion}-${darwinArchFile}-install.pkg";
     probeInputs = [ pkgs.xar ];
     assertScript = ''
       tmp=$(mktemp -d)
@@ -72,7 +69,7 @@ in
       test -f "$tmp/Distribution"
       test -f "$tmp/Resources/welcome.html"
       test -f "$tmp/Resources/license.txt"
-      test -f "$tmp/${rustName}-${rustVersion}-x86_64.pkg"
+      test -f "$tmp/${rustName}-${rustVersion}-${darwinArchFile}.pkg"
       grep -q "Rust Demo Installer" "$tmp/Distribution"
     '';
   };

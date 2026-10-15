@@ -13,10 +13,10 @@
       inherit (nixpkgs) lib;
       overlay = import ./overlay.nix;
 
+      # x86_64-darwin is dropped in nixpkgs 26.11; apple silicon only on darwin.
       supportedSystems = [
         "x86_64-linux"
         "aarch64-linux"
-        "x86_64-darwin"
         "aarch64-darwin"
       ];
 

@@ -1,14 +1,19 @@
 { pkgs, bundler }:
 
 let
-  # Checks below assert hardcoded x86_64 artifact names, so each drv must
-  # genuinely be that target regardless of host — cross-compile unless
-  # already native.
+  # linux/windows checks assert hardcoded x86_64 artifact names, so cross
+  # unless already native. Darwin checks are gated behind `isDarwin` at the
+  # call site; cross-building hello to darwin from linux pulls cctools,
+  # which only evaluates on darwin, so we only use the native build.
   isLinuxHost = pkgs.stdenv.hostPlatform.system == "x86_64-linux";
-  isX86_64Darwin = pkgs.stdenv.hostPlatform.system == "x86_64-darwin";
+  isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
   drv = if isLinuxHost then pkgs.hello else pkgs.pkgsCross.gnu64.hello;
   drvWin = pkgs.pkgsCross.mingwW64.hello;
-  drvDarwin = if isX86_64Darwin then pkgs.hello else pkgs.pkgsCross.x86_64-darwin.hello;
+  drvDarwin =
+    if isDarwin then
+      pkgs.hello
+    else
+      throw "tests/lib.nix: drvDarwin is darwin-only (checks gated behind isDarwin)";
 
   rustSrc = ./rust;
   rustName = "nix-bundle-app-rust-demo";
@@ -28,10 +33,21 @@ let
     if isLinuxHost then buildRust pkgs.rustPlatform else buildRust pkgs.pkgsCross.gnu64.rustPlatform;
   rustWindows = buildRust pkgs.pkgsCross.mingwW64.rustPlatform;
   rustDarwin =
-    if isX86_64Darwin then
+    if isDarwin then
       buildRust pkgs.rustPlatform
     else
-      buildRust pkgs.pkgsCross.x86_64-darwin.rustPlatform;
+      throw "tests/lib.nix: rustDarwin is darwin-only (checks gated behind isDarwin)";
+
+  # Native darwin arch for host-driven test targets: x86_64 Mach-O vs arm64
+  # Mach-O. verifyStagedBinaries would fail if we pinned x86_64 on an
+  # aarch64-darwin runner. `darwinArchFile` matches Apple's naming (arm64 /
+  # x86_64) — used both by `file -b` output and by the bundler's outFile.
+  darwinArch = if pkgs.stdenv.hostPlatform.isAarch64 then "aarch64" else "x86_64";
+  darwinArchFile = if pkgs.stdenv.hostPlatform.isAarch64 then "arm64" else "x86_64";
+  darwinTarget = {
+    arch = darwinArch;
+    os = "darwin";
+  };
 
   # `nsis` is `meta.broken` on darwin in nixpkgs; skip there, CI still runs it.
   canNsis = !pkgs.stdenv.hostPlatform.isDarwin;
@@ -146,5 +162,8 @@ in
     rustVersion
     canNsis
     canRpm
+    darwinArch
+    darwinArchFile
+    darwinTarget
     ;
 }

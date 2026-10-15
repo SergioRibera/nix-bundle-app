@@ -11,6 +11,8 @@ let
     info
     pkgs
     canNsis
+    darwinArchFile
+    darwinTarget
     ;
   inherit (pkgs) lib;
 in
@@ -43,10 +45,7 @@ in
     name = "service-pkg";
     format = "pkg";
     drv = drvDarwin;
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
+    target = darwinTarget;
     info = info // {
       services = [
         {
@@ -56,7 +55,7 @@ in
         }
       ];
     };
-    expect = "hello-*-x86_64.pkg";
+    expect = "hello-*-${darwinArchFile}.pkg";
   };
 }
 // lib.optionalAttrs canNsis {
