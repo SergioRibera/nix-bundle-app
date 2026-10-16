@@ -1,8 +1,27 @@
-{ pkgs, bundler }:
+{
+  pkgs ? import <nixpkgs> { },
+  bundler ? (pkgs.extend (import ../overlay.nix)).nixBundleApp,
+}:
 
 let
-  helloLinux = pkgs.hello;
-  helloWindows = if pkgs.stdenv.isLinux then pkgs.pkgsCross.mingwW64.hello else pkgs.hello;
+  inherit (pkgs) lib;
+  isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
+  # Native arch for darwin: aarch64 → arm64 (Apple's Mach-O naming) vs
+  # x86_64. Darwin bundles must declare their target arch to match the
+  # drv's actual arch, otherwise `verifyStagedBinaries` rejects.
+  darwinArch = if pkgs.stdenv.hostPlatform.isAarch64 then "aarch64" else "x86_64";
+
+  # Each drv genuinely targets its name (native when the host already
+  # matches, cross-compiled otherwise) since not every bundle below passes
+  # an explicit `target`. Darwin bundles are gated on an `isDarwin` host:
+  # cross-compiling hello to darwin from linux drags in cctools, which
+  # only evaluates on an aarch64-darwin host.
+  helloLinux =
+    if pkgs.stdenv.hostPlatform.system == "x86_64-linux" then
+      pkgs.hello
+    else
+      pkgs.pkgsCross.gnu64.hello;
+  helloWindows = pkgs.pkgsCross.mingwW64.hello;
 
   commonInfo = {
     description = "GNU Hello, the canonical example program";
@@ -123,42 +142,6 @@ in
     info = commonInfo;
   };
 
-  hello-app = bundler.bundle {
-    drv = helloLinux;
-    format = "app";
-    info = commonInfo;
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-  };
-
-  hello-brew = bundler.bundle {
-    drv = helloLinux;
-    format = "brew";
-    info = commonInfo // {
-      downloadUrl = "https://example.com/releases/hello.tar.gz";
-    };
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-  };
-
-  hello-dmg =
-    if pkgs.stdenv.isLinux || pkgs.stdenv.isDarwin then
-      bundler.bundle {
-        drv = helloLinux;
-        format = "dmg";
-        info = commonInfo;
-        target = {
-          arch = "x86_64";
-          os = "darwin";
-        };
-      }
-    else
-      null;
-
   hello-nsis = bundler.bundle {
     drv = helloWindows;
     format = "nsis";
@@ -210,34 +193,6 @@ in
     };
   };
 
-  hello-pkg = bundler.bundle {
-    drv = helloLinux;
-    format = "pkg";
-    info = commonInfo;
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-  };
-
-  hello-productbuild = bundler.bundle {
-    drv = helloLinux;
-    format = "productbuild";
-    info = commonInfo // {
-      productbuild = {
-        title = "Hello Installer";
-        organization = "com.example";
-        welcome = pkgs.writeText "welcome.html" "<html><body><h1>Hello</h1></body></html>";
-        license = pkgs.writeText "license.txt" "MIT.";
-        conclusion = pkgs.writeText "conclusion.html" "<html><body>Installed.</body></html>";
-      };
-    };
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-  };
-
   hello-msi = bundler.bundle {
     drv = helloWindows;
     format = "msi";
@@ -276,22 +231,6 @@ in
     };
   };
 
-  hello-all-darwin = bundler.bundleAll {
-    drv = helloLinux;
-    formats = [
-      "app"
-      "dmg"
-      "pkg"
-      "brew"
-      "tar.gz"
-    ];
-    info = commonInfo;
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-  };
-
   hello-service-deb = bundler.bundle {
     drv = helloLinux;
     format = "deb";
@@ -308,24 +247,6 @@ in
     info = serviceInfo;
   };
   # Intentionally no `hello-service-appimage`: schema asserts AppImage+services.
-  hello-service-app = bundler.bundle {
-    drv = helloLinux;
-    format = "app";
-    info = serviceInfo;
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-  };
-  hello-service-pkg = bundler.bundle {
-    drv = helloLinux;
-    format = "pkg";
-    info = serviceInfo;
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
-  };
   hello-service-nsis = bundler.bundle {
     drv = helloWindows;
     format = "nsis";
@@ -357,16 +278,18 @@ in
           "rpm"
         ];
       };
-      "x86_64-darwin" = {
-        drv = helloLinux;
-        formats = [ "tar.gz" ];
-      };
       "x86_64-windows" = {
         drv = helloWindows;
         formats = [
           "zip"
           "msi"
         ];
+      };
+    }
+    // lib.optionalAttrs isDarwin {
+      "${darwinArch}-darwin" = {
+        drv = pkgs.hello;
+        formats = [ "tar.gz" ];
       };
     };
   };
@@ -383,3 +306,84 @@ in
     };
   };
 }
+// lib.optionalAttrs isDarwin (
+  let
+    darwinTarget = {
+      arch = darwinArch;
+      os = "darwin";
+    };
+  in
+  {
+    hello-app = bundler.bundle {
+      drv = pkgs.hello;
+      format = "app";
+      info = commonInfo;
+      target = darwinTarget;
+    };
+
+    hello-brew = bundler.bundle {
+      drv = pkgs.hello;
+      format = "brew";
+      info = commonInfo // {
+        downloadUrl = "https://example.com/releases/hello.tar.gz";
+      };
+      target = darwinTarget;
+    };
+
+    hello-dmg = bundler.bundle {
+      drv = pkgs.hello;
+      format = "dmg";
+      info = commonInfo;
+      target = darwinTarget;
+    };
+
+    hello-pkg = bundler.bundle {
+      drv = pkgs.hello;
+      format = "pkg";
+      info = commonInfo;
+      target = darwinTarget;
+    };
+
+    hello-productbuild = bundler.bundle {
+      drv = pkgs.hello;
+      format = "productbuild";
+      info = commonInfo // {
+        productbuild = {
+          title = "Hello Installer";
+          organization = "com.example";
+          welcome = pkgs.writeText "welcome.html" "<html><body><h1>Hello</h1></body></html>";
+          license = pkgs.writeText "license.txt" "MIT.";
+          conclusion = pkgs.writeText "conclusion.html" "<html><body>Installed.</body></html>";
+        };
+      };
+      target = darwinTarget;
+    };
+
+    hello-all-darwin = bundler.bundleAll {
+      drv = pkgs.hello;
+      formats = [
+        "app"
+        "dmg"
+        "pkg"
+        "brew"
+        "tar.gz"
+      ];
+      info = commonInfo;
+      target = darwinTarget;
+    };
+
+    hello-service-app = bundler.bundle {
+      drv = pkgs.hello;
+      format = "app";
+      info = serviceInfo;
+      target = darwinTarget;
+    };
+
+    hello-service-pkg = bundler.bundle {
+      drv = pkgs.hello;
+      format = "pkg";
+      info = serviceInfo;
+      target = darwinTarget;
+    };
+  }
+)

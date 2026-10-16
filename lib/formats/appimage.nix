@@ -1,46 +1,62 @@
 {
-  pkgs,
   lib,
-  deps,
+  utils,
   desktop,
   signing,
   drv,
   format,
   meta,
   target,
+  stdenv,
+  squashfsTools,
+  coreutils,
+  file,
+  gnugrep,
+  gawk,
+  rsync,
+  patchelf,
+  gnused,
+  closureInfo,
   ...
 }:
 
 let
+  deps = import ../deps.nix {
+    inherit
+      lib
+      utils
+      closureInfo
+      coreutils
+      file
+      gawk
+      gnugrep
+      gnused
+      patchelf
+      rsync
+      ;
+  };
   outFile = "${meta.name}-${meta.version}-${target.arch}.AppImage";
 
   # Runtime is a ~200KB ELF that mounts the appended squashfs and execs AppRun.
-  # AppImage/type2-runtime publishes to a rolling `continuous` release tag, so
-  # the artifact rotates whenever upstream rebuilds. When CI trips a hash
-  # mismatch, refresh via:
-  #   nix-prefetch-url --type sha256 \
-  #     https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-<arch>
-  #   nix hash convert --hash-algo sha256 --to sri <base32>
-  # Downstreams can bypass the pin entirely with
-  # `info.appImageRuntime = pkgs.fetchurl { url=...; hash=...; }`.
-  defaultRuntime =
+  # AppImage/type2-runtime only publishes to a rolling `continuous` release
+  # tag whose assets rotate on every upstream rebuild, so pinning by URL +
+  # hash is unsustainable. Instead the current builds are vendored into
+  # this repo under `vendor/appimage-runtime/`; refresh with
+  # `scripts/update-appimage-runtime.sh` (or by hand via `curl -fsSL
+  # https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-<arch>
+  # -o vendor/appimage-runtime/runtime-<arch>`). Downstreams can still
+  # bypass the vendored binary with `info.appImageRuntime = …` (a path or
+  # a derivation whose outPath is a runnable ELF).
+  vendoredRuntime =
     let
-      url = "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-${target.arch}";
-      hash =
-        {
-          "x86_64" = "sha256-HMSbzx4szVk8N5rbF8n4WjbWGQiCllBN6VsdBiFa678=";
-          "aarch64" = "sha256-fV13K3wy8MhMrwpFKjBypXCQJ9fqxYVv64mnp6iIE3I=";
-        }
-        .${target.arch} or null;
+      path = ../../vendor/appimage-runtime/runtime-${target.arch};
     in
-    if hash == null then
-      throw "nix-bundle-app: no pinned AppImage runtime hash for arch '${target.arch}'. Supply meta.appImageRuntime."
+    if builtins.pathExists path then
+      path
     else
-      pkgs.fetchurl {
-        inherit url hash;
-      };
+      throw "nix-bundle-app: no vendored AppImage runtime for arch '${target.arch}'. Supply info.appImageRuntime or add vendor/appimage-runtime/runtime-${target.arch}.";
 
-  runtime = if meta.appImageRuntime != null then meta.appImageRuntime else defaultRuntime;
+  runtime = if meta.appImageRuntime != null then meta.appImageRuntime else vendoredRuntime;
 
   # AppImage spec requires exactly one top-level .desktop. Use the first
   # user-supplied entry; otherwise synthesize a minimal one from the
@@ -69,10 +85,10 @@ let
     exec "$HERE/usr/bin/${meta.name}" "$@"
   '';
 in
-pkgs.stdenv.mkDerivation {
+stdenv.mkDerivation {
   name = outFile;
   dontUnpack = true;
-  nativeBuildInputs = with pkgs; [
+  nativeBuildInputs = [
     squashfsTools
     coreutils
     file
@@ -91,6 +107,10 @@ pkgs.stdenv.mkDerivation {
     ${deps.copyResources drv "$AppDir/usr/share"}
 
     chmod -R u+w "$AppDir"
+    ${deps.verifyStagedBinaries {
+      binDir = "$AppDir/usr/bin";
+      inherit target;
+    }}
     ${deps.patchLinuxBinaries {
       binDir = "$AppDir/usr/bin";
       inherit target;
@@ -100,8 +120,9 @@ pkgs.stdenv.mkDerivation {
       setBundledRpath = true;
     }}
 
-    cp ${pkgs.writeText renderedDesktop.filename renderedDesktop.content} \
-       "$AppDir/${meta.name}.desktop"
+    cat > "$AppDir/${meta.name}.desktop" <<'DESKTOP_EOF'
+    ${renderedDesktop.content}
+    DESKTOP_EOF
 
     ${lib.optionalString (renderedDesktop.iconPath != null) ''
       cp "${renderedDesktop.iconPath}" "$AppDir/${meta.name}.png" || true
@@ -109,20 +130,16 @@ pkgs.stdenv.mkDerivation {
     ''}
     if [ ! -e "$AppDir/${meta.name}.png" ]; then
       # 1x1 transparent PNG so appimagetool spec is satisfied
-      ${pkgs.coreutils}/bin/printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xfc\xff\xff?\x00\x05\xfe\x02\xfe\xa3\x3e\x8a\xcc\x00\x00\x00\x00IEND\xaeB`\x82' > "$AppDir/${meta.name}.png"
+      ${coreutils}/bin/printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xfc\xff\xff?\x00\x05\xfe\x02\xfe\xa3\x3e\x8a\xcc\x00\x00\x00\x00IEND\xaeB`\x82' > "$AppDir/${meta.name}.png"
       ( cd "$AppDir" && ln -sf "${meta.name}.png" .DirIcon )
     fi
 
     # Must NOT use writeShellScript here: it injects a `/nix/store/...-bash`
     # shebang that dies on any non-Nix host. AppRun needs the portable
     # `#!/bin/sh` line already baked into `appRun`.
-    cp ${
-      pkgs.writeTextFile {
-        name = "AppRun";
-        text = appRun;
-        executable = true;
-      }
-    } "$AppDir/AppRun"
+    cat > "$AppDir/AppRun" <<'APPRUN_EOF'
+    ${appRun}
+    APPRUN_EOF
     chmod +x "$AppDir/AppRun"
 
     mksquashfs "$AppDir" payload.squashfs \

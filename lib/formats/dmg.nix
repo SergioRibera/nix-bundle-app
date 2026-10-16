@@ -1,48 +1,35 @@
 {
-  pkgs,
+  stdenv,
   lib,
-  deps,
   utils,
-  desktop,
-  services,
   signing,
-  drv,
   format,
   meta,
   target,
+  appBundle,
+  coreutils,
+  gnused,
+  gnutar,
+  xorriso,
+  ...
 }:
 
 let
-  appBundle = import ./app.nix {
-    inherit
-      pkgs
-      lib
-      deps
-      utils
-      desktop
-      services
-      signing
-      drv
-      format
-      meta
-      target
-      ;
-  };
   outFile = "${meta.name}-${meta.version}-${utils.darwinArch target.arch}.dmg";
 in
-pkgs.stdenv.mkDerivation (
+stdenv.mkDerivation (
   {
     name = outFile;
     dontUnpack = true;
     # Linux: emit an HFS+ hybrid ISO that Finder mounts transparently.
     # darwin: defer to hdiutil for a real UDIF DMG.
     nativeBuildInputs = [
-      pkgs.coreutils
-      pkgs.gnused
+      coreutils
+      gnused
     ]
-    ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.xorriso ];
+    ++ lib.optionals stdenv.isLinux [ xorriso ];
   }
-  // lib.optionalAttrs pkgs.stdenv.isDarwin {
+  // lib.optionalAttrs stdenv.isDarwin {
     # hdiutil lives outside the nix store and depends on system frameworks —
     # let nix expose the host binary + its runtime deps into the sandbox and
     # skip substitution (the output is host-dependent).
@@ -73,7 +60,7 @@ pkgs.stdenv.mkDerivation (
             -app-id "${meta.bundleId}" \
             -o "$out/${outFile}" \
             "$stage" 2>/dev/null \
-          || ${pkgs.gnutar}/bin/tar -czf "$out/${outFile}" -C "$stage" .
+          || ${gnutar}/bin/tar -czf "$out/${outFile}" -C "$stage" .
         '';
 
         darwinBuild = ''
@@ -94,11 +81,11 @@ pkgs.stdenv.mkDerivation (
               -ov -format UDZO "$out/${outFile}"
           else
             echo "hdiutil not available; falling back to tar (NOT a real DMG)." >&2
-            ${pkgs.gnutar}/bin/tar -czf "$out/${outFile}" -C "$stage" .
+            ${gnutar}/bin/tar -czf "$out/${outFile}" -C "$stage" .
           fi
         '';
       in
-      (if pkgs.stdenv.isDarwin then darwinBuild else linuxBuild)
+      (if stdenv.isDarwin then darwinBuild else linuxBuild)
       + signing.emitSignScript {
         inherit meta format;
         artifactGlob = "*.dmg";

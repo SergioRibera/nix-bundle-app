@@ -101,7 +101,7 @@ Read the entry for whichever format you're producing. Each section lists: requir
 
 ```nix
 bundler.bundleAll {
-  drv = self.packages.${system}.my-app;
+  drv = my-app;
   formats = bundler.linuxTargets;   # or any subset
   inherit info;
 };

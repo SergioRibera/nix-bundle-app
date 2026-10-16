@@ -1,8 +1,19 @@
 { pkgs, bundler }:
 
 let
-  drv = pkgs.hello;
-  drvWin = if pkgs.stdenv.isLinux then pkgs.pkgsCross.mingwW64.hello else pkgs.hello;
+  # linux/windows checks assert hardcoded x86_64 artifact names, so cross
+  # unless already native. Darwin checks are gated behind `isDarwin` at the
+  # call site; cross-building hello to darwin from linux pulls cctools,
+  # which only evaluates on darwin, so we only use the native build.
+  isLinuxHost = pkgs.stdenv.hostPlatform.system == "x86_64-linux";
+  isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
+  drv = if isLinuxHost then pkgs.hello else pkgs.pkgsCross.gnu64.hello;
+  drvWin = pkgs.pkgsCross.mingwW64.hello;
+  drvDarwin =
+    if isDarwin then
+      pkgs.hello
+    else
+      throw "tests/lib.nix: drvDarwin is darwin-only (checks gated behind isDarwin)";
 
   rustSrc = ./rust;
   rustName = "nix-bundle-app-rust-demo";
@@ -18,9 +29,32 @@ let
       doCheck = false;
     };
 
-  rustLinux = buildRust pkgs.rustPlatform;
-  rustWindows =
-    if pkgs.stdenv.isLinux then buildRust pkgs.pkgsCross.mingwW64.rustPlatform else rustLinux;
+  rustLinux =
+    if isLinuxHost then buildRust pkgs.rustPlatform else buildRust pkgs.pkgsCross.gnu64.rustPlatform;
+  rustWindows = buildRust pkgs.pkgsCross.mingwW64.rustPlatform;
+  rustDarwin =
+    if isDarwin then
+      buildRust pkgs.rustPlatform
+    else
+      throw "tests/lib.nix: rustDarwin is darwin-only (checks gated behind isDarwin)";
+
+  # Native darwin arch for host-driven test targets: x86_64 Mach-O vs arm64
+  # Mach-O. verifyStagedBinaries would fail if we pinned x86_64 on an
+  # aarch64-darwin runner. `darwinArchFile` matches Apple's naming (arm64 /
+  # x86_64) — used both by `file -b` output and by the bundler's outFile.
+  darwinArch = if pkgs.stdenv.hostPlatform.isAarch64 then "aarch64" else "x86_64";
+  darwinArchFile = if pkgs.stdenv.hostPlatform.isAarch64 then "arm64" else "x86_64";
+  darwinTarget = {
+    arch = darwinArch;
+    os = "darwin";
+  };
+
+  # `nsis` is `meta.broken` on darwin in nixpkgs; skip there, CI still runs it.
+  canNsis = !pkgs.stdenv.hostPlatform.isDarwin;
+
+  # rpmbuild only packages for its own host CPU regardless of `--target`, and
+  # this repo has no x86_64-linux builder; skip, CI (x86_64-linux) covers it.
+  canRpm = pkgs.stdenv.hostPlatform.system == "x86_64-linux";
 
   info = {
     homepage = "https://example.com";
@@ -120,9 +154,16 @@ in
     rustInfo
     drv
     drvWin
+    drvDarwin
     rustLinux
     rustWindows
+    rustDarwin
     rustName
     rustVersion
+    canNsis
+    canRpm
+    darwinArch
+    darwinArchFile
+    darwinTarget
     ;
 }

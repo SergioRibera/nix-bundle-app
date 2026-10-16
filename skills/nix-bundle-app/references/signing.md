@@ -1,6 +1,6 @@
 # Codesigning
 
-Secrets (private keys, p12 passwords) can't safely live in `/nix/store`. The bundle derivations stay pure & cacheable; `bundler.bundle` drops a turnkey `sign.sh` next to the artifact when `info.signing.<os>.enable = true`. You run `sign.sh` after `nix build` with env vars supplying the secrets.
+Secrets (private keys, p12 passwords) can't safely live in `/nix/store`. The bundle derivations stay pure & cacheable; `bundler.bundle` drops a turnkey `sign.sh` next to the artifact when `info.signing.<os>.enable = true`. You run `sign.sh` after building the bundle with env vars supplying the secrets.
 
 ## Enable signing
 
@@ -30,7 +30,7 @@ info.signing = {
 
 ## Run `sign.sh`
 
-After `nix build .#my-app-deb`:
+After `nix-build -A my-app-deb`:
 
 ```sh
 # darwin / windows
@@ -55,14 +55,15 @@ Signers under the hood:
 
 ## One-shot build + sign (`bundler.signedApp`)
 
-`signedApp` wraps a bundle as a `nix run` app. The bundle stays cached; only the sign step runs impure in your shell.
+`signedApp` returns a runnable derivation that stages a copy of the bundle and signs it. The bundle stays cached; only the sign step runs impure in your shell.
 
 ```nix
-apps.my-app-deb-signed = bundler.signedApp { bundle = self.packages.${system}.my-app-deb; };
+my-app-deb-signed = bundler.signedApp { bundle = my-app-deb; };
 ```
 
 ```sh
-GPG_KEY_ID=0xABCDEF1234567890 nix run .#my-app-deb-signed -- ./dist
+nix-build -A my-app-deb-signed -o sign-my-app-deb
+GPG_KEY_ID=0xABCDEF1234567890 ./sign-my-app-deb/bin/my-app-deb-sign -- ./dist
 # → ./dist/<name>.deb (signed). sign.sh removed from output.
 ```
 

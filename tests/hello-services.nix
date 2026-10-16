@@ -7,8 +7,14 @@ let
     check
     drv
     drvWin
+    drvDarwin
     info
+    pkgs
+    canNsis
+    darwinArchFile
+    darwinTarget
     ;
+  inherit (pkgs) lib;
 in
 {
   bundle-service-deb = check {
@@ -33,15 +39,13 @@ in
     };
     expect = "hello_*_amd64.deb";
   };
-
+}
+// lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
   bundle-service-pkg = check {
     name = "service-pkg";
     format = "pkg";
-    inherit drv;
-    target = {
-      arch = "x86_64";
-      os = "darwin";
-    };
+    drv = drvDarwin;
+    target = darwinTarget;
     info = info // {
       services = [
         {
@@ -51,9 +55,10 @@ in
         }
       ];
     };
-    expect = "hello-*-x86_64.pkg";
+    expect = "hello-*-${darwinArchFile}.pkg";
   };
-
+}
+// lib.optionalAttrs canNsis {
   bundle-service-nsis = check {
     name = "service-nsis";
     format = "nsis";

@@ -1,6 +1,7 @@
-# End-to-end darwin bundle tests for the Rust demo binary. Linux host build —
-# we extract the .app/.pkg/etc. payload to verify structure, since running the
-# binaries requires a darwin host.
+# End-to-end darwin bundle tests for the Rust demo binary. Only runs on a
+# darwin host (gated in tests/default.nix); only extracts the .app/.pkg/etc.
+# payload to check structure, since running the binary still requires the
+# target's exact OS.
 { helpers }:
 
 let
@@ -8,21 +9,18 @@ let
     e2e
     pkgs
     rustInfo
-    rustLinux
+    rustDarwin
     rustName
     rustVersion
+    darwinArchFile
+    darwinTarget
     ;
-
-  darwinTarget = {
-    arch = "x86_64";
-    os = "darwin";
-  };
 in
 {
   rust-app = e2e {
     name = "rust-app";
     format = "app";
-    drv = rustLinux;
+    drv = rustDarwin;
     info = rustInfo;
     target = darwinTarget;
     expect = "${rustName}.app";
@@ -37,10 +35,10 @@ in
   rust-pkg = e2e {
     name = "rust-pkg";
     format = "pkg";
-    drv = rustLinux;
+    drv = rustDarwin;
     info = rustInfo;
     target = darwinTarget;
-    expect = "${rustName}-${rustVersion}-x86_64.pkg";
+    expect = "${rustName}-${rustVersion}-${darwinArchFile}.pkg";
     probeInputs = [ pkgs.xar ];
     assertScript = ''
       tmp=$(mktemp -d)
@@ -54,7 +52,7 @@ in
   rust-productbuild = e2e {
     name = "rust-productbuild";
     format = "productbuild";
-    drv = rustLinux;
+    drv = rustDarwin;
     info = rustInfo // {
       productbuild = {
         title = "Rust Demo Installer";
@@ -63,15 +61,18 @@ in
       };
     };
     target = darwinTarget;
-    expect = "${rustName}-${rustVersion}-x86_64-install.pkg";
+    expect = "${rustName}-${rustVersion}-${darwinArchFile}-install.pkg";
     probeInputs = [ pkgs.xar ];
+    # Native /usr/bin/productbuild unpacks the component pkg into a xar
+    # subdirectory; the linux manual-xar path keeps it as a flat file.
+    # Use `-e` so both shapes pass.
     assertScript = ''
       tmp=$(mktemp -d)
       ( cd "$tmp" && xar -xf "$artifact" )
       test -f "$tmp/Distribution"
       test -f "$tmp/Resources/welcome.html"
       test -f "$tmp/Resources/license.txt"
-      test -f "$tmp/${rustName}-${rustVersion}-x86_64.pkg"
+      test -e "$tmp/${rustName}-${rustVersion}-${darwinArchFile}.pkg"
       grep -q "Rust Demo Installer" "$tmp/Distribution"
     '';
   };
@@ -79,7 +80,7 @@ in
   rust-brew = e2e {
     name = "rust-brew";
     format = "brew";
-    drv = rustLinux;
+    drv = rustDarwin;
     info = rustInfo;
     target = darwinTarget;
     expect = "${rustName}.rb";

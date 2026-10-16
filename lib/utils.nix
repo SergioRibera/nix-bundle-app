@@ -16,7 +16,10 @@ rec {
   detectTargetFromDrv =
     drv:
     let
-      sys = drv.system or drv.stdenv.hostPlatform.system or "x86_64-linux";
+      # `drv.system` is the build platform, not necessarily the target (a
+      # cross-compiled drv still builds on the host); `hostPlatform` tracks
+      # the real target and must win when present.
+      sys = drv.stdenv.hostPlatform.system or drv.system or "x86_64-linux";
       p = parseSystem sys;
     in
     normalizeTarget p;

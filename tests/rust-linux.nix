@@ -10,7 +10,9 @@ let
     rustLinux
     rustName
     rustVersion
+    canRpm
     ;
+  inherit (pkgs) lib;
 in
 {
   rust-deb = e2e {
@@ -27,23 +29,6 @@ in
       dpkg-deb -e "$artifact" "$tmp/CONTROL"
       grep -q "Package: ${rustName}" "$tmp/CONTROL/control"
       grep -q "Depends:" "$tmp/CONTROL/control"
-    '';
-  };
-
-  rust-rpm = e2e {
-    name = "rust-rpm";
-    format = "rpm";
-    drv = rustLinux;
-    info = rustInfo;
-    expect = "${rustName}-${rustVersion}-1.x86_64.rpm";
-    probeInputs = [
-      pkgs.rpm
-      pkgs.cpio
-    ];
-    assertScript = ''
-      tmp=$(mktemp -d)
-      ( cd "$tmp" && rpm2cpio "$artifact" | cpio -idm 2>/dev/null )
-      test -x "$tmp/opt/${rustName}/bin/${rustName}"
     '';
   };
 
@@ -149,6 +134,24 @@ in
       grep -q "confinement: strict" "$artifact"
       grep -q "command: bin/${rustName}" "$artifact"
       test -x "$bundleDir/payload/opt/${rustName}/bin/${rustName}"
+    '';
+  };
+}
+// lib.optionalAttrs canRpm {
+  rust-rpm = e2e {
+    name = "rust-rpm";
+    format = "rpm";
+    drv = rustLinux;
+    info = rustInfo;
+    expect = "${rustName}-${rustVersion}-1.x86_64.rpm";
+    probeInputs = [
+      pkgs.rpm
+      pkgs.cpio
+    ];
+    assertScript = ''
+      tmp=$(mktemp -d)
+      ( cd "$tmp" && rpm2cpio "$artifact" | cpio -idm 2>/dev/null )
+      test -x "$tmp/opt/${rustName}/bin/${rustName}"
     '';
   };
 }
