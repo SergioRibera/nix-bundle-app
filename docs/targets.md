@@ -29,3 +29,4 @@ format names.
 Wildcards (`tar.gz`, `tar.xz`, `tar.zst`, `zip`) are host-agnostic and appear
 under every OS. `brew` is restricted to linux + darwin (linuxbrew +
 Homebrew). Every other format is OS-specific.
+

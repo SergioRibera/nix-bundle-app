@@ -5,6 +5,7 @@ Edit the schema and let the `docs` GitHub Actions workflow regenerate this page.
 
 ---
 
+
 ## appImageRuntime
 
 Override the AppImage type2 runtime binary\. Defaults to a pinned ` fetchurl ` of ` AppImage/type2-runtime `\.
@@ -1097,7 +1098,7 @@ Extra files dropped into the staged tree at fixed absolute paths\.
 Keys are the destination paths inside the installed package
 (e\.g\. ` /lib/udev/rules.d/61-myapp.rules `)\. Values are either a
 Nix path / store path (copied verbatim) or an inline string
-(materialised via ` pkgs.writeText ` and copied)\.
+(written directly into the destination at build time)\.
 
 Honoured by the linux installer formats (` deb `, ` rpm `,
 ` archlinux `)\. Ignored by ` appimage ` / ` flatpak ` / ` snap ` (no
