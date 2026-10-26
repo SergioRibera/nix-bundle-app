@@ -37,8 +37,13 @@ let
 
   closureOf = drv: closureInfo { rootPaths = if builtins.isList drv then drv else [ drv ]; };
 
+  # `hostLibs`: extra name prefixes left to the target system (`info.hostLibs`).
   copyLinuxLibs =
-    drv: destLibDir:
+    {
+      drv,
+      destLibDir,
+      hostLibs ? [ ],
+    }:
     let
       closure = closureOf drv;
     in
@@ -65,7 +70,7 @@ let
             case "$bn" in
               ${std}.so*|${std}-*.so*|${std}_*.so*) skip=1 ;;
             esac
-          '') linuxBaseLibs}
+          '') (linuxBaseLibs ++ hostLibs)}
           [ $skip -eq 1 ] && continue
           if [ ! -e "${destLibDir}/$bn" ]; then
             cp -P "$so" "${destLibDir}/$bn"

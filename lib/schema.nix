@@ -880,6 +880,62 @@ in
       '';
     };
 
+    hostLibs = mkOption {
+      type = types.listOf types.str;
+      default = [
+        # GPU / driver stack: glvnd and the Vulkan loader locate vendor
+        # drivers through paths compiled in at build time, which point
+        # into /nix/store — Nix's copies find no driver on other distros.
+        "libGL"
+        "libGLX"
+        "libGLdispatch"
+        "libOpenGL"
+        "libEGL"
+        "libGLESv1_CM"
+        "libGLESv2"
+        "libvulkan"
+        "libgbm"
+        "libdrm"
+        "libnvidia"
+        "libcuda"
+        "libva"
+        "libvdpau"
+        # Config/data lookups compiled to /nix/store paths: fonts.conf,
+        # XKB keymaps, X locale db, ALSA config. freetype rides along
+        # with fontconfig so both come from the same build.
+        "libfontconfig"
+        "libfreetype"
+        "libxkbcommon"
+        "libX11"
+        "libxcb"
+        "libasound"
+      ];
+      description = ''
+        Library name prefixes that Linux bundles never copy out of the Nix
+        closure; the target's own copies are used instead. A prefix
+        matches `<prefix>.so*`, `<prefix>-*.so*` and `<prefix>_*.so*`
+        (so `libxcb` also covers `libxcb-xkb`, `libX11` covers
+        `libX11-xcb`).
+
+        The defaults are libraries every desktop distro ships and whose
+        Nix builds break off-Nix: GPU driver loaders (glvnd, Vulkan,
+        GBM) and libraries that read config or data from compiled-in
+        store paths (fontconfig, xkbcommon, X11 locales, ALSA). Package
+        formats still declare them as dependencies through
+        `autoDepends`.
+
+        Applies wherever libs are bundled (`deb`/`rpm`/`archlinux` with
+        `bundleLibs`, `appimage`, archives, and the payload `flatpak` /
+        `snap` stage). Setting it replaces the default list; `[ ]` gives
+        a fully self-contained bundle.
+      '';
+      example = [
+        "libGL"
+        "libEGL"
+        "libvulkan"
+      ];
+    };
+
     binDir = mkOption {
       type = types.str;
       default = "bin";

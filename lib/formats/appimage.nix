@@ -103,7 +103,11 @@ stdenv.mkDerivation {
     mkdir -p "$AppDir/usr/bin" "$AppDir/usr/lib" "$AppDir/usr/share"
 
     ${deps.copyBinaries drv "$AppDir/usr/bin"}
-    ${deps.copyLinuxLibs drv "$AppDir/usr/lib"}
+    ${deps.copyLinuxLibs {
+      inherit drv;
+      destLibDir = "$AppDir/usr/lib";
+      inherit (meta) hostLibs;
+    }}
     ${deps.copyResources drv "$AppDir/usr/share"}
 
     chmod -R u+w "$AppDir"

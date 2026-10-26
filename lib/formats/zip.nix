@@ -69,7 +69,11 @@ let
     stage=$PWD/${meta.name}-${meta.version}
     mkdir -p "$stage/bin" "$stage/lib"
     ${deps.copyBinaries drv "$stage/bin"}
-    ${deps.copyLinuxLibs drv "$stage/lib"}
+    ${deps.copyLinuxLibs {
+      inherit drv;
+      destLibDir = "$stage/lib";
+      inherit (meta) hostLibs;
+    }}
     if [ -d "${drv}/share" ]; then
       ${rsync}/bin/rsync -a --copy-links "${drv}/share/" "$stage/share/" || true
     fi

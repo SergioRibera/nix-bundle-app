@@ -119,7 +119,13 @@ let
       ${lib.optionalString meta.bundleLibs ''mkdir -p "$base/lib"''}
 
       ${deps.copyBinaries drv "$base/bin"}
-      ${lib.optionalString meta.bundleLibs (deps.copyLinuxLibs drv "$base/lib")}
+      ${lib.optionalString meta.bundleLibs (
+        deps.copyLinuxLibs {
+          inherit drv;
+          destLibDir = "$base/lib";
+          inherit (meta) hostLibs;
+        }
+      )}
       ${deps.copyResources drv "$base/share"}
 
       chmod -R u+w "$base"

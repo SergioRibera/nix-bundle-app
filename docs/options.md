@@ -1312,6 +1312,76 @@ drv.meta.homepage or ""
 
 
 
+## hostLibs
+
+
+
+Library name prefixes that Linux bundles never copy out of the Nix
+closure; the target’s own copies are used instead\. A prefix
+matches ` <prefix>.so* `, ` <prefix>-*.so* ` and ` <prefix>_*.so* `
+(so ` libxcb ` also covers ` libxcb-xkb `, ` libX11 ` covers
+` libX11-xcb `)\.
+
+The defaults are libraries every desktop distro ships and whose
+Nix builds break off-Nix: GPU driver loaders (glvnd, Vulkan,
+GBM) and libraries that read config or data from compiled-in
+store paths (fontconfig, xkbcommon, X11 locales, ALSA)\. Package
+formats still declare them as dependencies through
+` autoDepends `\.
+
+Applies wherever libs are bundled (` deb `/` rpm `/` archlinux ` with
+` bundleLibs `, ` appimage `, archives, and the payload ` flatpak ` /
+` snap ` stage)\. Setting it replaces the default list; ` [ ] ` gives
+a fully self-contained bundle\.
+
+
+
+*Type:*
+list of string
+
+
+
+*Default:*
+
+```nix
+[
+  "libGL"
+  "libGLX"
+  "libGLdispatch"
+  "libOpenGL"
+  "libEGL"
+  "libGLESv1_CM"
+  "libGLESv2"
+  "libvulkan"
+  "libgbm"
+  "libdrm"
+  "libnvidia"
+  "libcuda"
+  "libva"
+  "libvdpau"
+  "libfontconfig"
+  "libfreetype"
+  "libxkbcommon"
+  "libX11"
+  "libxcb"
+  "libasound"
+]
+```
+
+
+
+*Example:*
+
+```nix
+[
+  "libGL"
+  "libEGL"
+  "libvulkan"
+]
+```
+
+
+
 ## installDirName
 
 
@@ -2263,8 +2333,6 @@ submodule
 
 ## services\.\*\.systemd\.installOverrides
 
-
-
 Extra ` [Install] ` fields to set/override\.
 
 
@@ -2283,6 +2351,8 @@ attribute set of unspecified value
 
 
 ## services\.\*\.systemd\.serviceOverrides
+
+
 
 Extra ` [Service] ` fields to set/override\.
 

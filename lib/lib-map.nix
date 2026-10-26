@@ -241,22 +241,22 @@
       archlinux = "qt6-base";
     };
 
-    "libx11.so.6" = {
+    "libX11.so.6" = {
       deb = "libx11-6";
       rpm = "libX11";
       archlinux = "libx11";
     };
-    "libxext.so.6" = {
+    "libXext.so.6" = {
       deb = "libxext6";
       rpm = "libXext";
       archlinux = "libxext";
     };
-    "libxrender.so.1" = {
+    "libXrender.so.1" = {
       deb = "libxrender1";
       rpm = "libXrender";
       archlinux = "libxrender";
     };
-    "libxrandr.so.2" = {
+    "libXrandr.so.2" = {
       deb = "libxrandr2";
       rpm = "libXrandr";
       archlinux = "libxrandr";
@@ -296,6 +296,69 @@
       deb = "libsystemd0";
       rpm = "systemd-libs";
       archlinux = "systemd-libs";
+    };
+
+    # GPU stack and other `info.hostLibs` defaults — never bundled, so the
+    # packages must declare them for the distro to provide.
+    "libGL.so.1" = {
+      deb = "libgl1";
+      rpm = "libglvnd-glx";
+      archlinux = "libglvnd";
+    };
+    "libGLX.so.0" = {
+      deb = "libglx0";
+      rpm = "libglvnd-glx";
+      archlinux = "libglvnd";
+    };
+    "libGLdispatch.so.0" = {
+      deb = "libglvnd0";
+      rpm = "libglvnd";
+      archlinux = "libglvnd";
+    };
+    "libOpenGL.so.0" = {
+      deb = "libopengl0";
+      rpm = "libglvnd-opengl";
+      archlinux = "libglvnd";
+    };
+    "libEGL.so.1" = {
+      deb = "libegl1";
+      rpm = "libglvnd-egl";
+      archlinux = "libglvnd";
+    };
+    "libGLESv2.so.2" = {
+      deb = "libgles2";
+      rpm = "libglvnd-gles";
+      archlinux = "libglvnd";
+    };
+    "libvulkan.so.1" = {
+      deb = "libvulkan1";
+      rpm = "vulkan-loader";
+      archlinux = "vulkan-icd-loader";
+    };
+    "libgbm.so.1" = {
+      deb = "libgbm1";
+      rpm = "mesa-libgbm";
+      archlinux = "mesa";
+    };
+    "libdrm.so.2" = {
+      deb = "libdrm2";
+      rpm = "libdrm";
+      archlinux = "libdrm";
+    };
+    "libX11-xcb.so.1" = {
+      deb = "libx11-xcb1";
+      rpm = "libX11-xcb";
+      archlinux = "libx11";
+    };
+    "libxkbcommon-x11.so.0" = {
+      deb = "libxkbcommon-x11-0";
+      rpm = "libxkbcommon-x11";
+      archlinux = "libxkbcommon-x11";
+    };
+    "libasound.so.2" = {
+      deb = "libasound2";
+      rpm = "alsa-lib";
+      archlinux = "alsa-lib";
     };
   };
 }
