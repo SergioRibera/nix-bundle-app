@@ -44,7 +44,26 @@ let
     in
     lib.optionalString (meta.desktopEntries != [ ]) ''
       mkdir -p "${stage}/usr/share/applications"
-      ${lib.concatStrings (lib.imap1 writeOne (map desktop.renderEntry meta.desktopEntries))}
+      ${lib.concatStrings (lib.imap1 writeOne (map desktop.renderEntry (desktopEntriesOf meta)))}
+    '';
+
+  # Desktop entries without an explicit `icon` point at `info.icon`.
+  desktopEntriesOf =
+    meta:
+    map (
+      e: if meta.iconSet != null && (e.icon or null) == null then e // { icon = meta.iconName; } else e
+    ) meta.desktopEntries;
+
+  # `info.icon` as hicolor PNGs named `meta.iconName`.
+  writeIconTheme =
+    meta: stage:
+    lib.optionalString (meta.iconSet != null) ''
+      for dir in "${meta.iconSet}/hicolor"/*; do
+        size=$(basename "$dir")
+        mkdir -p "${stage}/usr/share/icons/hicolor/$size/apps"
+        cp "$dir/apps/icon.png" "${stage}/usr/share/icons/hicolor/$size/apps/${meta.iconName}.png"
+        chmod 644 "${stage}/usr/share/icons/hicolor/$size/apps/${meta.iconName}.png"
+      done
     '';
 
   # Materialise meta.extraFiles into the staged tree. Each entry is
@@ -158,6 +177,7 @@ let
 
       ${writeSystemdUnits meta "${stage}/lib/systemd/system"}
       ${writeDesktopEntries meta stage}
+      ${writeIconTheme meta stage}
       ${writeExtraFiles meta stage}
     '';
 
@@ -237,6 +257,8 @@ in
 {
   inherit
     stageLinux
+    desktopEntriesOf
+    writeIconTheme
     systemdRenderedUnits
     enabledServiceNames
     hasServices

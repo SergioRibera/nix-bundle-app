@@ -40,7 +40,7 @@ let
         <bundle id="${meta.bundleId}"
                 CFBundleIdentifier="${meta.bundleId}"
                 path="${
-                  if hasServices then "./Applications/${meta.name}.app" else "./${meta.name}.app"
+                  if hasServices then "./Applications/${meta.appBundleName}" else "./${meta.appBundleName}"
                 }"
                 CFBundleVersion="${meta.version}"
                 CFBundleShortVersionString="${meta.version}"/>
@@ -88,7 +88,7 @@ stdenv.mkDerivation {
           if hasServices then
             ''
               mkdir -p "$root/Applications" "$root/Library/LaunchDaemons"
-              cp -r ${appBundle}/${meta.name}.app "$root/Applications/"
+              cp -r "${appBundle}/${meta.appBundleName}" "$root/Applications/"
               ${lib.concatStrings (
                 lib.imap1 (i: p: ''
                   cat > "$root/Library/LaunchDaemons/${p.filename}" <<'LAUNCHD_${toString i}_EOF'
@@ -100,7 +100,7 @@ stdenv.mkDerivation {
             ''
           else
             ''
-              cp -r ${appBundle}/${meta.name}.app "$root/"
+              cp -r "${appBundle}/${meta.appBundleName}" "$root/"
             ''
         }
         chmod -R u+w "$root"

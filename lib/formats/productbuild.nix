@@ -20,7 +20,7 @@ let
   esc = utils.xmlEscape;
   pb = meta.productbuild;
 
-  title = if pb.title != null then pb.title else meta.name;
+  title = if pb.title != null then pb.title else meta.displayName;
   organization =
     if pb.organization != null then
       pb.organization

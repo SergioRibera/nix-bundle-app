@@ -729,6 +729,31 @@ in
       example = "my-app";
     };
 
+    displayName = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = ''
+        Human-facing app name: the macOS `.app` bundle and `CFBundleName`,
+        the DMG volume, the Windows installer, Start menu shortcut and
+        "Apps & features" entry. Defaults to `name`, which keeps driving
+        every path, package name and registry key.
+      '';
+      example = "My App";
+    };
+
+    icon = mkOption {
+      type = types.nullOr types.path;
+      default = null;
+      description = ''
+        Square PNG (1024 px recommended) every format derives its icon from:
+        freedesktop hicolor PNGs named after `bundleId` (and the default
+        `Icon=` of desktop entries, the AppImage `.DirIcon`, the snap icon),
+        the `.icns` of a `.app` (unless `macOsIcon` is set) and the `.ico`
+        of the NSIS / MSI installers and their shortcuts.
+      '';
+      example = literalExpression "./assets/icon.png";
+    };
+
     version = mkOption {
       type = types.str;
       default = drv.version or "0.0.0";

@@ -50,13 +50,13 @@ stdenv.mkDerivation (
         linuxBuild = ''
           stage=$PWD/dmg-root
           mkdir -p "$stage"
-          cp -r ${appBundle}/${meta.name}.app "$stage/"
+          cp -r "${appBundle}/${meta.appBundleName}" "$stage/"
           chmod -R u+w "$stage"
 
           mkdir -p $out
           xorrisofs \
             -hfsplus \
-            -V "${meta.name}" \
+            -V "${meta.displayName}" \
             -app-id "${meta.bundleId}" \
             -o "$out/${outFile}" \
             "$stage" 2>/dev/null \
@@ -66,7 +66,7 @@ stdenv.mkDerivation (
         darwinBuild = ''
           stage=$PWD/dmg-root
           mkdir -p "$stage"
-          cp -r ${appBundle}/${meta.name}.app "$stage/"
+          cp -r "${appBundle}/${meta.appBundleName}" "$stage/"
           chmod -R u+w "$stage"
           mkdir -p $out
           # hdiutil ships with macOS, never through nixpkgs — hit the absolute
@@ -74,10 +74,10 @@ stdenv.mkDerivation (
           # the tar fallback (which produces a `.dmg` that Finder rejects with
           # "image not recognized").
           if [ -x /usr/bin/hdiutil ]; then
-            /usr/bin/hdiutil create -volname "${meta.name}" -srcfolder "$stage" \
+            /usr/bin/hdiutil create -volname "${meta.displayName}" -srcfolder "$stage" \
               -ov -format UDZO "$out/${outFile}"
           elif command -v hdiutil >/dev/null 2>&1; then
-            hdiutil create -volname "${meta.name}" -srcfolder "$stage" \
+            hdiutil create -volname "${meta.displayName}" -srcfolder "$stage" \
               -ov -format UDZO "$out/${outFile}"
           else
             echo "hdiutil not available; falling back to tar (NOT a real DMG)." >&2

@@ -32,6 +32,8 @@ let
         bundleId =
           if cfg.bundleId != null then cfg.bundleId else "com.example.${utils.sanitizeName cfg.name}";
         installDirName = if cfg.installDirName != null then cfg.installDirName else cfg.name;
+        displayName = if cfg.displayName != null then cfg.displayName else cfg.name;
+        appBundleName = "${if cfg.displayName != null then cfg.displayName else cfg.name}.app";
         inherit target format;
         debArch = utils.debArch target.arch;
         rpmArch = utils.rpmArch target.arch;
@@ -40,7 +42,14 @@ let
       };
     in
     # Force assertion check before returning meta.
-    builtins.seq assertionGuard (cfg // derived);
+    builtins.seq assertionGuard (
+      cfg
+      // derived
+      // {
+        # freedesktop icon name: flatpak requires it to equal the app id.
+        iconName = derived.bundleId;
+      }
+    );
 in
 {
   inherit normalize;

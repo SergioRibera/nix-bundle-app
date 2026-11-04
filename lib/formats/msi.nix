@@ -52,6 +52,7 @@ let
   programFilesId = if target.arch == "x86_64" then "ProgramFiles64Folder" else "ProgramFilesFolder";
 
   esc = utils.xmlEscape;
+  hasIcon = meta.iconSet != null;
 
   svcXmlByBin = services.msiServiceXmlByBin meta.services;
   svcBinNames = builtins.attrNames svcXmlByBin;
@@ -60,7 +61,7 @@ let
     <?xml version="1.0" encoding="UTF-8"?>
     <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
       <Product Id="*"
-               Name="${esc meta.name}"
+               Name="${esc meta.displayName}"
                Language="1033"
                Version="${esc meta.version}"
                Manufacturer="${esc meta.maintainer}"
@@ -71,24 +72,29 @@ let
                  ${msiArchAttr}
                  Description="${esc meta.summary}"
                  Manufacturer="${esc meta.maintainer}"/>
-        <MajorUpgrade DowngradeErrorMessage="A newer version of ${esc meta.name} is already installed."/>
+        <MajorUpgrade DowngradeErrorMessage="A newer version of ${esc meta.displayName} is already installed."/>
         <MediaTemplate EmbedCab="yes"/>
+        ${lib.optionalString hasIcon ''
+          <Icon Id="AppIcon.ico" SourceFile="app-icon.ico"/>
+          <Property Id="ARPPRODUCTICON" Value="AppIcon.ico"/>
+        ''}
 
         <Directory Id="TARGETDIR" Name="SourceDir">
           <Directory Id="${programFilesId}">
             <Directory Id="INSTALLFOLDER" Name="${esc meta.installDirName}"/>
           </Directory>
           <Directory Id="ProgramMenuFolder">
-            <Directory Id="ApplicationProgramsFolder" Name="${esc meta.name}"/>
+            <Directory Id="ApplicationProgramsFolder" Name="${esc meta.displayName}"/>
           </Directory>
         </Directory>
 
         <DirectoryRef Id="ApplicationProgramsFolder">
           <Component Id="ApplicationShortcut" Guid="*">
             <Shortcut Id="AppShortcut"
-                      Name="${esc meta.name}"
+                      Name="${esc meta.displayName}"
                       Description="${esc meta.summary}"
                       Target="[INSTALLFOLDER]${esc meta.name}.exe"
+                      ${lib.optionalString hasIcon ''Icon="AppIcon.ico"''}
                       WorkingDirectory="INSTALLFOLDER"/>
             <RemoveFolder Id="RemoveAppMenuFolder" On="uninstall"/>
             <RegistryValue Root="HKCU"
@@ -100,7 +106,7 @@ let
           </Component>
         </DirectoryRef>
 
-        <Feature Id="MainFeature" Title="${esc meta.name}" Level="1">
+        <Feature Id="MainFeature" Title="${esc meta.displayName}" Level="1">
           <ComponentGroupRef Id="MainComponents"/>
           <ComponentRef Id="ApplicationShortcut"/>
         </Feature>
@@ -168,6 +174,7 @@ stdenv.mkDerivation {
     fi
     chmod -R u+w payload
 
+    ${lib.optionalString hasIcon ''cp "${meta.iconSet}/icon.ico" app-icon.ico''}
     cat > installer.wxs <<'WXS_EOF'
     ${wxs}
     WXS_EOF

@@ -45,15 +45,23 @@ let
   installBat = services.renderWindowsBundleBat meta.services { exeRelative = exeRel; };
   uninstallBat = services.renderWindowsUninstallBat meta.services;
   hasServices = meta.services != [ ];
+  hasIcon = meta.iconSet != null;
+  # Installed next to the binary: shortcuts and "Apps & features" use it.
+  iconRel = "${meta.name}.ico";
 
   nsi = ''
     !define APPNAME "${meta.name}"
+    !define DISPLAYNAME "${meta.displayName}"
     !define APPVERSION "${meta.version}"
     !define COMPANYNAME "${meta.maintainer}"
     !define DESCRIPTION "${meta.summary}"
     !define HOMEPAGE "${meta.homepage}"
 
-    Name "$\{APPNAME}"
+    Name "$\{DISPLAYNAME}"
+    ${lib.optionalString hasIcon ''
+      Icon "payload\\${iconRel}"
+      UninstallIcon "payload\\${iconRel}"
+    ''}
     OutFile "${outFile}"
     InstallDir "$PROGRAMFILES64\\${installDirName}"
     InstallDirRegKey HKLM "Software\\$\{APPNAME}" "Install_Dir"
@@ -72,7 +80,11 @@ let
 
       WriteRegStr HKLM "Software\\$\{APPNAME}" "Install_Dir" "$INSTDIR"
       WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$\{APPNAME}" \
-                       "DisplayName" "$\{APPNAME}"
+                       "DisplayName" "$\{DISPLAYNAME}"
+      ${lib.optionalString hasIcon ''
+        WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$\{APPNAME}" \
+                         "DisplayIcon" "$INSTDIR\\${iconRel}"
+      ''}
       WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$\{APPNAME}" \
                        "DisplayVersion" "$\{APPVERSION}"
       WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$\{APPNAME}" \
@@ -84,7 +96,9 @@ let
 
       WriteUninstaller "$INSTDIR\\${uninstallerName}"
 
-      CreateShortCut "$SMPROGRAMS\\$\{APPNAME}.lnk" "$INSTDIR\\${meta.name}.exe" "" "$INSTDIR\\${meta.name}.exe" 0
+      CreateShortCut "$SMPROGRAMS\\$\{DISPLAYNAME}.lnk" "$INSTDIR\\${meta.name}.exe" "" "$INSTDIR\\${
+        if hasIcon then iconRel else "${meta.name}.exe"
+      }" 0
 
       ${lib.optionalString hasServices ''
         ; Register Windows services declared in info.services
@@ -98,7 +112,7 @@ let
       ''}
       Delete "$INSTDIR\\${uninstallerName}"
       RMDir /r "$INSTDIR"
-      Delete "$SMPROGRAMS\\$\{APPNAME}.lnk"
+      Delete "$SMPROGRAMS\\$\{DISPLAYNAME}.lnk"
       DeleteRegKey HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$\{APPNAME}"
       DeleteRegKey HKLM "Software\\$\{APPNAME}"
     SectionEnd
@@ -122,6 +136,9 @@ stdenv.mkDerivation {
           ${rsync}/bin/rsync -a --copy-links "${drv}/share/" "payload/share/" || true
         fi
         chmod -R u+w payload
+        ${lib.optionalString hasIcon ''
+          cp "${meta.iconSet}/icon.ico" "payload/${iconRel}"
+        ''}
 
         ${lib.optionalString hasServices ''
           cat > payload/install-services.bat <<'INSTALL_SERVICES_EOF'

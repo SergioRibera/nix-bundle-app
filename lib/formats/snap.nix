@@ -85,6 +85,7 @@ let
 
   manifestYaml =
     "name: ${meta.name}\n"
+    + "title: ${meta.displayName}\n"
     + "version: '${meta.version}'\n"
     + "summary: ${summary}\n"
     + "description: |\n"
@@ -153,6 +154,11 @@ stdenv.mkDerivation {
     mkdir -p $out/snap $out/payload
     ${coreutils}/bin/cp -a --no-preserve=ownership "$payload"/. $out/payload/
 
+    ${lib.optionalString (meta.iconSet != null) ''
+      # snapcraft picks `snap/gui/icon.png` up as the store / launcher icon.
+      mkdir -p $out/snap/gui
+      cp "${meta.iconSet}/hicolor/512x512/apps/icon.png" $out/snap/gui/icon.png
+    ''}
     cat > "$out/snap/snapcraft.yaml" <<'MANIFEST_EOF'
     ${manifestYaml}
     MANIFEST_EOF

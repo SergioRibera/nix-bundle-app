@@ -34,7 +34,15 @@ let
       rsync
       ;
   };
-  appName = "${meta.name}.app";
+  appName = meta.appBundleName;
+  # An explicit `.icns` wins over the one rendered from `info.icon`.
+  icns =
+    if meta.macOsIcon != null then
+      meta.macOsIcon
+    else if meta.iconSet != null then
+      "${meta.iconSet}/icon.icns"
+    else
+      null;
   execName = meta.name;
   renderedServices = services.renderAllLaunchd meta.services;
 
@@ -43,8 +51,8 @@ let
     <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
     <plist version="1.0">
     <dict>
-      <key>CFBundleName</key>            <string>${meta.name}</string>
-      <key>CFBundleDisplayName</key>     <string>${meta.name}</string>
+      <key>CFBundleName</key>            <string>${meta.displayName}</string>
+      <key>CFBundleDisplayName</key>     <string>${meta.displayName}</string>
       <key>CFBundleExecutable</key>      <string>${execName}</string>
       <key>CFBundleIdentifier</key>      <string>${meta.bundleId}</string>
       <key>CFBundleVersion</key>         <string>${meta.version}</string>
@@ -55,9 +63,7 @@ let
       <key>LSMinimumSystemVersion</key>  <string>${meta.minimumSystemVersion}</string>
       <key>NSHighResolutionCapable</key> <true/>
       <key>NSPrincipalClass</key>        <string>NSApplication</string>
-      ${lib.optionalString (
-        meta.macOsIcon != null
-      ) "<key>CFBundleIconFile</key><string>AppIcon.icns</string>"}
+      ${lib.optionalString (icns != null) "<key>CFBundleIconFile</key><string>AppIcon.icns</string>"}
     </dict>
     </plist>
   '';
@@ -90,8 +96,8 @@ stdenv.mkDerivation {
         ${deps.patchDarwinLibs "$appdir/Contents/Frameworks"}
         ${deps.patchDarwinBinaries "$appdir/Contents/MacOS"}
 
-        ${lib.optionalString (meta.macOsIcon != null) ''
-          cp "${meta.macOsIcon}" "$appdir/Contents/Resources/AppIcon.icns" || true
+        ${lib.optionalString (icns != null) ''
+          cp "${icns}" "$appdir/Contents/Resources/AppIcon.icns" || true
         ''}
 
         cat > "$appdir/Contents/Info.plist" <<'EOF'

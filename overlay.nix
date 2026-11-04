@@ -109,7 +109,17 @@ let
       meta =
         assert lib.assertMsg (osMatches allowedOS t.os)
           "nix-bundle-app: format '${format}' requires os='${allowedDesc}', got os='${t.os}'.";
-        infoLib.normalize info drv t format;
+        let
+          normalized = infoLib.normalize info drv t format;
+        in
+        normalized
+        // {
+          iconSet =
+            if normalized.icon == null then
+              null
+            else
+              pkgs.callPackage ./lib/icons.nix { source = normalized.icon; };
+        };
 
       # Formats that embed another format's derivation as a nested
       # sub-bundle (dmg/pkg embed app.nix; productbuild embeds pkg.nix,

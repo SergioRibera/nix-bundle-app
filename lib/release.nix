@@ -151,6 +151,7 @@ let
   mkInstallSh =
     {
       name,
+      appBundleName,
       version,
       releaseUrl,
       entries,
@@ -162,6 +163,7 @@ let
       set -eu
 
       NAME='${name}'
+      APP_BUNDLE='${appBundleName}'
       DEFAULT_VERSION='${version}'
       DEFAULT_RELEASE_URL='${releaseUrl}'
 
@@ -301,7 +303,7 @@ let
           rpm)        $SUDO rpm  -e "$NAME" 2>/dev/null || true ;;
           archlinux)  $SUDO pacman -R --noconfirm "$NAME" 2>/dev/null || true ;;
           pkg|dmg|app)
-            $SUDO rm -rf "/Applications/$NAME.app" "/opt/$NAME" 2>/dev/null || true ;;
+            $SUDO rm -rf "/Applications/$APP_BUNDLE" "/opt/$NAME" 2>/dev/null || true ;;
           appimage)
             rm -f "$INSTALL_DIR/$NAME.AppImage" "$INSTALL_DIR/$NAME" ;;
           *)          rm -f "$INSTALL_DIR/$NAME" ;;
@@ -610,6 +612,7 @@ let
 
       installShText = mkInstallSh {
         name = scriptName;
+        appBundleName = headInfo.appBundleName;
         version = scriptVersion;
         inherit releaseUrl;
         entries = sorted;

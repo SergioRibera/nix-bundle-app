@@ -61,18 +61,25 @@ let
   # AppImage spec requires exactly one top-level .desktop. Use the first
   # user-supplied entry; otherwise synthesize a minimal one from the
   # package's name + summary so the AppImage is still spec-compliant.
-  primaryEntry =
+  givenEntry =
     if meta.desktopEntries != [ ] then
       builtins.head meta.desktopEntries
     else
       {
-        name = meta.name;
+        name = meta.displayName;
         exec = "${meta.name} %F";
-        comment = if meta.summary != "" then meta.summary else meta.name;
-        icon = meta.name;
+        comment = if meta.summary != "" then meta.summary else meta.displayName;
+        icon = if meta.iconSet != null then meta.iconName else meta.name;
         categories = [ "Utility" ];
         terminal = meta.appImageTerminal;
       };
+
+  # With `info.icon`, entries without an explicit icon use it.
+  primaryEntry =
+    if meta.iconSet != null && (givenEntry.icon or null) == null then
+      givenEntry // { icon = meta.iconName; }
+    else
+      givenEntry;
 
   renderedDesktop = desktop.renderEntry primaryEntry;
 
@@ -128,15 +135,26 @@ stdenv.mkDerivation {
     ${renderedDesktop.content}
     DESKTOP_EOF
 
-    ${lib.optionalString (renderedDesktop.iconPath != null) ''
+    ${lib.optionalString (meta.iconSet != null) ''
+      cp "${meta.iconSet}/hicolor/256x256/apps/icon.png" "$AppDir/${primaryEntry.icon}.png"
+      ( cd "$AppDir" && ln -sf "${primaryEntry.icon}.png" .DirIcon )
+      for dir in "${meta.iconSet}/hicolor"/*; do
+        size=$(basename "$dir")
+        mkdir -p "$AppDir/usr/share/icons/hicolor/$size/apps"
+        cp "$dir/apps/icon.png" "$AppDir/usr/share/icons/hicolor/$size/apps/${meta.iconName}.png"
+      done
+    ''}
+    ${lib.optionalString (meta.iconSet == null && renderedDesktop.iconPath != null) ''
       cp "${renderedDesktop.iconPath}" "$AppDir/${meta.name}.png" || true
       ( cd "$AppDir" && ln -sf "${meta.name}.png" .DirIcon )
     ''}
-    if [ ! -e "$AppDir/${meta.name}.png" ]; then
-      # 1x1 transparent PNG so appimagetool spec is satisfied
-      ${coreutils}/bin/printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xfc\xff\xff?\x00\x05\xfe\x02\xfe\xa3\x3e\x8a\xcc\x00\x00\x00\x00IEND\xaeB`\x82' > "$AppDir/${meta.name}.png"
-      ( cd "$AppDir" && ln -sf "${meta.name}.png" .DirIcon )
-    fi
+    ${lib.optionalString (meta.iconSet == null) ''
+      if [ ! -e "$AppDir/${meta.name}.png" ]; then
+        # 1x1 transparent PNG so appimagetool spec is satisfied
+        ${coreutils}/bin/printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xfc\xff\xff?\x00\x05\xfe\x02\xfe\xa3\x3e\x8a\xcc\x00\x00\x00\x00IEND\xaeB`\x82' > "$AppDir/${meta.name}.png"
+        ( cd "$AppDir" && ln -sf "${meta.name}.png" .DirIcon )
+      fi
+    ''}
 
     # Must NOT use writeShellScript here: it injects a `/nix/store/...-bash`
     # shebang that dies on any non-Nix host. AppRun needs the portable
