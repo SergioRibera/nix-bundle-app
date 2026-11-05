@@ -30,7 +30,9 @@ let
 
       # `1.2.0-alpha.1+build` split for package managers that reject `-`
       # in versions: deb and rpm sort `~` before the release, pacman takes
-      # `_`, MSI and macOS bundles want plain numbers.
+      # `_`, MSI and macOS bundles want plain numbers. Only the package
+      # metadata uses these; file names keep `version`, since release hosts
+      # rename assets with characters such as `~`.
       release = builtins.head (lib.splitString "+" cfg.version);
       versionParts = lib.splitString "-" release;
       numericVersion = builtins.head versionParts;

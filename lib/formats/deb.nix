@@ -57,7 +57,7 @@ let
   pkgName = utils.debName meta.name;
 in
 stdenv.mkDerivation {
-  name = "${pkgName}-${meta.debVersion}-${meta.debArch}.deb";
+  name = "${pkgName}-${meta.version}-${meta.debArch}.deb";
   dontUnpack = true;
   nativeBuildInputs = [
     dpkg
@@ -141,7 +141,7 @@ stdenv.mkDerivation {
     ''}
 
     mkdir -p $out
-    fakeroot dpkg-deb --build "$stage" "$out/${pkgName}_${meta.debVersion}_${meta.debArch}.deb"
+    fakeroot dpkg-deb --build "$stage" "$out/${pkgName}_${meta.version}_${meta.debArch}.deb"
 
     ${signing.emitSignScript {
       inherit meta format;
@@ -152,6 +152,6 @@ stdenv.mkDerivation {
   passthru = {
     info = meta;
     inherit target format;
-    outFile = "${pkgName}_${meta.debVersion}_${meta.debArch}.deb";
+    outFile = "${pkgName}_${meta.version}_${meta.debArch}.deb";
   };
 }

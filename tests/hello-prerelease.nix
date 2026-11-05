@@ -23,7 +23,7 @@ in
     format = "deb";
     inherit drv;
     info = alpha;
-    expect = "hello_1.2.0~alpha.1_amd64.deb";
+    expect = "hello_1.2.0-alpha.1_amd64.deb";
     probeInputs = [ pkgs.dpkg ];
     assertScript = ''
       test "$(dpkg-deb -f "$artifact" Version)" = "1.2.0~alpha.1"
@@ -35,7 +35,7 @@ in
     format = "archlinux";
     inherit drv;
     info = alpha;
-    expect = "hello-1.2.0_alpha.1-1-x86_64.pkg.tar.zst";
+    expect = "hello-1.2.0-alpha.1-1-x86_64.pkg.tar.zst";
     probeInputs = [ pkgs.libarchive ];
     assertScript = ''
       tmp=$(mktemp -d)
@@ -66,7 +66,7 @@ in
     format = "rpm";
     inherit drv;
     info = alpha;
-    expect = "hello-1.2.0~alpha.1-1.x86_64.rpm";
+    expect = "hello-1.2.0-alpha.1-1.x86_64.rpm";
     probeInputs = [ pkgs.rpm ];
     assertScript = ''
       test "$(rpm -qp --queryformat '%{VERSION}' "$artifact")" = "1.2.0~alpha.1"

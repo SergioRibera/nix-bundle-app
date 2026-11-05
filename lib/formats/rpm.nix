@@ -53,7 +53,7 @@ let
   hasIcons = lib.any (e: e.iconPath != null) meta.desktopEntries;
 in
 stdenv.mkDerivation {
-  name = "${meta.name}-${meta.rpmVersion}-1.${meta.rpmArch}.rpm";
+  name = "${meta.name}-${meta.version}-1.${meta.rpmArch}.rpm";
   dontUnpack = true;
   nativeBuildInputs = [
     rpm
@@ -172,7 +172,7 @@ stdenv.mkDerivation {
 
     mkdir -p $out
     cp "$topdir/RPMS/${meta.rpmArch}/${meta.name}-${meta.rpmVersion}-1.${meta.rpmArch}.rpm" \
-       "$out/${meta.name}-${meta.rpmVersion}-1.${meta.rpmArch}.rpm"
+       "$out/${meta.name}-${meta.version}-1.${meta.rpmArch}.rpm"
 
     ${signing.emitSignScript {
       inherit meta format;
@@ -183,6 +183,6 @@ stdenv.mkDerivation {
   passthru = {
     info = meta;
     inherit target format;
-    outFile = "${meta.name}-${meta.rpmVersion}-1.${meta.rpmArch}.rpm";
+    outFile = "${meta.name}-${meta.version}-1.${meta.rpmArch}.rpm";
   };
 }

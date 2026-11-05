@@ -57,7 +57,7 @@ let
   wantAur = mode == "aur" || mode == "both";
 
   aurPkgname = "${meta.name}-bin";
-  aurTarName = "${aurPkgname}-${meta.archVersion}-${pkgArch}.tar.gz";
+  aurTarName = "${aurPkgname}-${meta.version}-${pkgArch}.tar.gz";
   # `meta.downloadUrl` is a directory prefix (same contract as the
   # installer / install.md use of `releaseUrl`). Append the tarball
   # filename so PKGBUILD's `source=()` resolves to a real asset URL.
@@ -97,9 +97,9 @@ let
 
   drvName =
     if mode == "aur" then
-      "${aurPkgname}-${meta.archVersion}-${pkgArch}.aur"
+      "${aurPkgname}-${meta.version}-${pkgArch}.aur"
     else
-      "${meta.name}-${meta.archVersion}-1-${pkgArch}.pkg.tar.zst";
+      "${meta.name}-${meta.version}-1-${pkgArch}.pkg.tar.zst";
 
   pkgBlock = lib.optionalString wantPkg ''
     instSize=$(${coreutils}/bin/du -sb "$stage" | ${coreutils}/bin/cut -f1)
@@ -164,7 +164,7 @@ let
         .PKGINFO $mtree_extra * | ${gzip}/bin/gzip -n -9 > .MTREE
     )
 
-    out_pkg="$out/${meta.name}-${meta.archVersion}-1-${pkgArch}.pkg.tar.zst"
+    out_pkg="$out/${meta.name}-${meta.version}-1-${pkgArch}.pkg.tar.zst"
     (
       cd "$stage"
       tar_extra=""
@@ -290,6 +290,6 @@ stdenv.mkDerivation {
     inherit target format;
     archlinuxMode = mode;
     outFile =
-      if mode == "aur" then "PKGBUILD" else "${meta.name}-${meta.archVersion}-1-${pkgArch}.pkg.tar.zst";
+      if mode == "aur" then "PKGBUILD" else "${meta.name}-${meta.version}-1-${pkgArch}.pkg.tar.zst";
   };
 }
