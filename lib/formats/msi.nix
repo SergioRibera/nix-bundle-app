@@ -63,7 +63,7 @@ let
       <Product Id="*"
                Name="${esc meta.displayName}"
                Language="1033"
-               Version="${esc meta.version}"
+               Version="${esc meta.numericVersion}"
                Manufacturer="${esc meta.maintainer}"
                UpgradeCode="${upgradeCode}">
         <Package InstallerVersion="200"

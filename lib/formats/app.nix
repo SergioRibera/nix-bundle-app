@@ -55,8 +55,8 @@ let
       <key>CFBundleDisplayName</key>     <string>${meta.displayName}</string>
       <key>CFBundleExecutable</key>      <string>${execName}</string>
       <key>CFBundleIdentifier</key>      <string>${meta.bundleId}</string>
-      <key>CFBundleVersion</key>         <string>${meta.version}</string>
-      <key>CFBundleShortVersionString</key><string>${meta.version}</string>
+      <key>CFBundleVersion</key>         <string>${meta.numericVersion}</string>
+      <key>CFBundleShortVersionString</key><string>${meta.numericVersion}</string>
       <key>CFBundlePackageType</key>     <string>APPL</string>
       <key>CFBundleSignature</key>       <string>${meta.bundleSignature}</string>
       <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>

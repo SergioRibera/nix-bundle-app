@@ -53,7 +53,7 @@ let
   hasIcons = lib.any (e: e.iconPath != null) meta.desktopEntries;
 in
 stdenv.mkDerivation {
-  name = "${meta.name}-${meta.version}-1.${meta.rpmArch}.rpm";
+  name = "${meta.name}-${meta.rpmVersion}-1.${meta.rpmArch}.rpm";
   dontUnpack = true;
   nativeBuildInputs = [
     rpm
@@ -70,7 +70,7 @@ stdenv.mkDerivation {
   buildCommand = ''
     export HOME=$(mktemp -d)
     topdir=$HOME/rpmbuild
-    buildroot=$topdir/BUILDROOT/${meta.name}-${meta.version}-1.${meta.rpmArch}
+    buildroot=$topdir/BUILDROOT/${meta.name}-${meta.rpmVersion}-1.${meta.rpmArch}
     export RPM_DB_PATH=$HOME/.rpmdb
     mkdir -p "$RPM_DB_PATH"
     mkdir -p "$topdir"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
@@ -113,7 +113,7 @@ stdenv.mkDerivation {
 
     {
       echo "Name: ${meta.name}"
-      echo "Version: ${meta.version}"
+      echo "Version: ${meta.rpmVersion}"
       echo "Release: 1%{?dist}"
       echo "Summary: ${meta.summary}"
       echo "License: ${meta.license}"
@@ -171,8 +171,8 @@ stdenv.mkDerivation {
       -bb "$topdir/SPECS/${meta.name}.spec"
 
     mkdir -p $out
-    cp "$topdir/RPMS/${meta.rpmArch}/${meta.name}-${meta.version}-1.${meta.rpmArch}.rpm" \
-       "$out/${meta.name}-${meta.version}-1.${meta.rpmArch}.rpm"
+    cp "$topdir/RPMS/${meta.rpmArch}/${meta.name}-${meta.rpmVersion}-1.${meta.rpmArch}.rpm" \
+       "$out/${meta.name}-${meta.rpmVersion}-1.${meta.rpmArch}.rpm"
 
     ${signing.emitSignScript {
       inherit meta format;
@@ -183,6 +183,6 @@ stdenv.mkDerivation {
   passthru = {
     info = meta;
     inherit target format;
-    outFile = "${meta.name}-${meta.version}-1.${meta.rpmArch}.rpm";
+    outFile = "${meta.name}-${meta.rpmVersion}-1.${meta.rpmArch}.rpm";
   };
 }

@@ -28,7 +28,25 @@ let
             + lib.concatMapStringsSep "\n" (a: "  - " + a.message) failed
           );
 
+      # `1.2.0-alpha.1+build` split for package managers that reject `-`
+      # in versions: deb and rpm sort `~` before the release, pacman takes
+      # `_`, MSI and macOS bundles want plain numbers.
+      release = builtins.head (lib.splitString "+" cfg.version);
+      versionParts = lib.splitString "-" release;
+      numericVersion = builtins.head versionParts;
+      prerelease =
+        if builtins.length versionParts > 1 then
+          lib.concatStringsSep "." (builtins.tail versionParts)
+        else
+          null;
+      withPrerelease =
+        sep: if prerelease == null then numericVersion else "${numericVersion}${sep}${prerelease}";
+
       derived = {
+        inherit numericVersion;
+        debVersion = withPrerelease "~";
+        rpmVersion = withPrerelease "~";
+        archVersion = withPrerelease "_";
         bundleId =
           if cfg.bundleId != null then cfg.bundleId else "com.example.${utils.sanitizeName cfg.name}";
         installDirName = if cfg.installDirName != null then cfg.installDirName else cfg.name;
