@@ -57,6 +57,9 @@ let
   svcXmlByBin = services.msiServiceXmlByBin meta.services;
   svcBinNames = builtins.attrNames svcXmlByBin;
 
+  fileAssociations = import ../file-associations.nix { inherit lib; };
+  assocComponent = fileAssociations.wixComponent meta;
+
   wxs = ''
     <?xml version="1.0" encoding="UTF-8"?>
     <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
@@ -105,10 +108,11 @@ let
                            KeyPath="yes"/>
           </Component>
         </DirectoryRef>
-
+        ${assocComponent}
         <Feature Id="MainFeature" Title="${esc meta.displayName}" Level="1">
           <ComponentGroupRef Id="MainComponents"/>
           <ComponentRef Id="ApplicationShortcut"/>
+          ${lib.optionalString (assocComponent != "") ''<ComponentRef Id="FileAssociations"/>''}
         </Feature>
       </Product>
     </Wix>
@@ -213,6 +217,11 @@ stdenv.mkDerivation {
 
   passthru = {
     info = meta;
-    inherit target format outFile;
+    inherit
+      target
+      format
+      outFile
+      wxs
+      ;
   };
 }

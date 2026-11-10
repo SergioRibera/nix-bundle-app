@@ -93,6 +93,33 @@ A single service struct materialises as:
 
 Full per-OS overrides (systemd unit/service kvs, launchd processType, sc.exe account/start/errorControl, …) are in [docs/options.md](docs/options.md).
 
+### File associations
+
+`info.fileAssociations` lists the file types the app opens, so the installed app shows up under "Open with" and owns the types it defines:
+
+```nix
+info.fileAssociations = [
+  {
+    id = "org.example.hello.document"; # UTI on macOS, ProgID on Windows
+    name = "Hello document";
+    extensions = [ "hello" ];
+    mimeTypes = [ "application/x-hello" ];
+    role = "editor";   # viewer | editor
+    rank = "owner";    # owner | default | alternate
+    exported = true;   # the app defines this type (needs `id`)
+  }
+  { id = "com.adobe.pdf"; name = "PDF document"; extensions = [ "pdf" ]; mimeTypes = [ "application/pdf" ]; }
+];
+```
+
+| Format | Output |
+|---|---|
+| deb / rpm / archlinux / tar.gz / flatpak / AppImage | MIME types added to `MimeType=` of desktop entries without their own `mimeTypes` (`%F` appended to an `exec` with no field code); exported types ship `/usr/share/mime/packages/<bundleId>.xml` |
+| app / dmg / pkg / productbuild | `CFBundleDocumentTypes`, `UTExportedTypeDeclarations` for exported types, `UTImportedTypeDeclarations` for other ids outside `public.*` / `com.apple.*` / `com.adobe.pdf` |
+| MSI / NSIS | ProgID (`id` when exported, else `<bundleId>.<first extension>`) with `FriendlyTypeName`, `DefaultIcon` and `shell\open\command`, listed under `.<ext>\OpenWithProgids`; `rank = "owner"` also sets the extension default. Removed on uninstall |
+
+Distros refresh the MIME database from shared-mime-info's own package triggers, so the packages carry no `update-mime-database` hook. snap and brew ship no desktop integration, so they ignore the option.
+
 ### One icon, one display name
 
 `info.icon` takes a single square PNG (1024 px recommended) and every format renders its own icon from it; `info.displayName` is the name people see, while `name` keeps driving paths, package names and registry keys:

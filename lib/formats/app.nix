@@ -45,6 +45,7 @@ let
       null;
   execName = meta.name;
   renderedServices = services.renderAllLaunchd meta.services;
+  fileAssociations = import ../file-associations.nix { inherit lib; };
 
   plist = ''
     <?xml version="1.0" encoding="UTF-8"?>
@@ -64,6 +65,7 @@ let
       <key>NSHighResolutionCapable</key> <true/>
       <key>NSPrincipalClass</key>        <string>NSApplication</string>
       ${lib.optionalString (icns != null) "<key>CFBundleIconFile</key><string>AppIcon.icns</string>"}
+      ${fileAssociations.plistKeys meta}
     </dict>
     </plist>
   '';
@@ -134,5 +136,6 @@ stdenv.mkDerivation {
     inherit target format;
     outFile = appName;
     launchdPlists = renderedServices;
+    infoPlist = plist;
   };
 }

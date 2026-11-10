@@ -36,6 +36,8 @@ let
       ;
   };
   outFile = "${meta.name}-${meta.version}-${target.arch}.AppImage";
+  fileAssociations = import ../file-associations.nix { inherit lib; };
+  mimePackage = fileAssociations.mimePackage meta;
 
   # Runtime is a ~200KB ELF that mounts the appended squashfs and execs AppRun.
   # AppImage/type2-runtime only publishes to a rolling `continuous` release
@@ -74,12 +76,14 @@ let
         terminal = meta.appImageTerminal;
       };
 
-  # With `info.icon`, entries without an explicit icon use it.
-  primaryEntry =
+  # With `info.icon`, entries without an explicit icon use it; without
+  # `mimeTypes` they take the ones of `info.fileAssociations`.
+  primaryEntry = fileAssociations.withMimeTypes meta (
     if meta.iconSet != null && (givenEntry.icon or null) == null then
       givenEntry // { icon = meta.iconName; }
     else
-      givenEntry;
+      givenEntry
+  );
 
   renderedDesktop = desktop.renderEntry primaryEntry;
 
@@ -134,6 +138,13 @@ stdenv.mkDerivation {
     cat > "$AppDir/${meta.name}.desktop" <<'DESKTOP_EOF'
     ${renderedDesktop.content}
     DESKTOP_EOF
+    ${lib.optionalString (mimePackage != null) ''
+      # Read by desktop integrators (appimaged, Gear Lever) on install.
+      mkdir -p "$AppDir/usr/share/mime/packages"
+      cat > "$AppDir${fileAssociations.mimePackagePath meta}" <<'MIME_PACKAGE_EOF'
+      ${mimePackage}
+      MIME_PACKAGE_EOF
+    ''}
 
     ${lib.optionalString (meta.iconSet != null) ''
       cp "${meta.iconSet}/hicolor/256x256/apps/icon.png" "$AppDir/${primaryEntry.icon}.png"

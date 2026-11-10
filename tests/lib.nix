@@ -148,6 +148,7 @@ in
 {
   inherit
     pkgs
+    bundler
     check
     e2e
     info

@@ -1168,6 +1168,281 @@ attribute set of (absolute path or string)
 
 
 
+## fileAssociations
+
+
+
+File types the app opens, so installed bundles show it under “Open
+with” and claim the types it defines\.
+
+ - linux: every MIME type joins ` MimeType= ` of the desktop entries that
+   set no ` mimeTypes ` of their own (` %F ` is appended to an ` exec `
+   without a field code), and exported types ship
+   ` /usr/share/mime/packages/<bundleId>.xml `\.
+ - macOS ` .app ` (and dmg, pkg, productbuild): ` CFBundleDocumentTypes `,
+   plus ` UTExportedTypeDeclarations ` for exported types and
+   ` UTImportedTypeDeclarations ` for other non-system ids\.
+ - Windows (MSI, NSIS): one ProgID per association with
+   ` shell\open\command `, listed under ` OpenWithProgids ` of every
+   extension, and the extension default when ` rank = "owner" `\.
+   The ProgID is ` id ` for exported types, ` <bundleId>.<first extension> `
+   otherwise\.
+
+
+
+*Type:*
+list of (submodule)
+
+
+
+*Default:*
+
+```nix
+[ ]
+```
+
+
+
+*Example:*
+
+```nix
+[
+  {
+    id = "org.example.hello.document";
+    name = "Hello document";
+    extensions = [ "hello" ];
+    mimeTypes = [ "application/x-hello" ];
+    role = "editor";
+    rank = "owner";
+    exported = true;
+  }
+  {
+    id = "com.adobe.pdf";
+    name = "PDF document";
+    extensions = [ "pdf" ];
+    mimeTypes = [ "application/pdf" ];
+  }
+]
+
+```
+
+
+
+## fileAssociations\.\*\.conformsTo
+
+
+
+macOS only: parent UTIs of a declared type (` UTTypeConformsTo `)\.
+
+
+
+*Type:*
+list of string
+
+
+
+*Default:*
+
+```nix
+[
+  "public.data"
+]
+```
+
+
+
+*Example:*
+
+```nix
+[
+  "public.data"
+  "public.content"
+]
+```
+
+
+
+## fileAssociations\.\*\.exported
+
+
+
+The app defines this type\. macOS gets a ` UTExportedTypeDeclarations `
+entry and Linux a shared-mime-info package declaring the MIME types
+with their extension globs\.
+
+
+
+*Type:*
+boolean
+
+
+
+*Default:*
+
+```nix
+false
+```
+
+
+
+## fileAssociations\.\*\.extensions
+
+
+
+File extensions without the leading dot\.
+
+
+
+*Type:*
+list of string
+
+
+
+*Default:*
+
+```nix
+[ ]
+```
+
+
+
+*Example:*
+
+```nix
+[
+  "hello"
+]
+```
+
+
+
+## fileAssociations\.\*\.id
+
+
+
+Uniform Type Identifier on macOS and ProgID on Windows for an
+exported type\. Use the system UTI for well-known types
+(` com.adobe.pdf `, ` public.plain-text `)\. Required when ` exported = true `\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+*Example:*
+
+```nix
+"org.example.hello.document"
+```
+
+
+
+## fileAssociations\.\*\.mimeTypes
+
+
+
+MIME types of the type\. Linux matches desktop entries to files by these\.
+
+
+
+*Type:*
+list of string
+
+
+
+*Default:*
+
+```nix
+[ ]
+```
+
+
+
+*Example:*
+
+```nix
+[
+  "application/x-hello"
+]
+```
+
+
+
+## fileAssociations\.\*\.name
+
+
+
+Human-readable type name (` CFBundleTypeName `, MIME ` <comment> `, Windows ` FriendlyTypeName `)\.
+
+
+
+*Type:*
+string
+
+
+
+*Example:*
+
+```nix
+"Hello document"
+```
+
+
+
+## fileAssociations\.\*\.rank
+
+
+
+How strongly the app claims the type\. macOS ` LSHandlerRank `; on
+Windows ` owner ` also makes the app the default handler of every
+extension, the other ranks only add it to “Open with”\.
+
+
+
+*Type:*
+one of “owner”, “default”, “alternate”
+
+
+
+*Default:*
+
+```nix
+"alternate"
+```
+
+
+
+## fileAssociations\.\*\.role
+
+
+
+Whether the app only opens (` viewer `) or also saves (` editor `) the type\. macOS ` CFBundleTypeRole `\.
+
+
+
+*Type:*
+one of “viewer”, “editor”
+
+
+
+*Default:*
+
+```nix
+"viewer"
+```
+
+
+
 ## flatpak
 
 
@@ -2167,8 +2442,6 @@ null
 
 ## services\.\*\.launchd\.processType
 
-
-
 Plist ` ProcessType `\.
 
 
@@ -2355,6 +2628,8 @@ null
 
 
 ## services\.\*\.stdout
+
+
 
 Standard output redirect (file path)\.
 

@@ -7,6 +7,8 @@
 }:
 
 let
+  fileAssociations = import ../file-associations.nix { inherit lib; };
+
   systemdRenderedUnits = meta: map services.renderSystemd meta.services;
 
   writeSystemdUnits =
@@ -47,12 +49,33 @@ let
       ${lib.concatStrings (lib.imap1 writeOne (map desktop.renderEntry (desktopEntriesOf meta)))}
     '';
 
-  # Desktop entries without an explicit `icon` point at `info.icon`.
+  # Desktop entries without an explicit `icon` point at `info.icon`; those
+  # without `mimeTypes` take the ones of `info.fileAssociations`.
   desktopEntriesOf =
     meta:
     map (
-      e: if meta.iconSet != null && (e.icon or null) == null then e // { icon = meta.iconName; } else e
+      e:
+      fileAssociations.withMimeTypes meta (
+        if meta.iconSet != null && (e.icon or null) == null then e // { icon = meta.iconName; } else e
+      )
     ) meta.desktopEntries;
+
+  # shared-mime-info package for the types the app defines.
+  writeMimePackage =
+    meta: stage:
+    let
+      xml = fileAssociations.mimePackage meta;
+      dest = "${stage}${fileAssociations.mimePackagePath meta}";
+    in
+    lib.optionalString (xml != null) ''
+      mkdir -p "$(dirname "${dest}")"
+      cat > "${dest}" <<'MIME_PACKAGE_EOF'
+      ${xml}
+      MIME_PACKAGE_EOF
+      chmod 644 "${dest}"
+    '';
+
+  hasMimePackage = meta: fileAssociations.mimePackage meta != null;
 
   # `info.icon` as hicolor PNGs named `meta.iconName`.
   writeIconTheme =
@@ -178,6 +201,7 @@ let
       ${writeSystemdUnits meta "${stage}/lib/systemd/system"}
       ${writeDesktopEntries meta stage}
       ${writeIconTheme meta stage}
+      ${writeMimePackage meta stage}
       ${writeExtraFiles meta stage}
     '';
 
@@ -259,6 +283,8 @@ in
     stageLinux
     desktopEntriesOf
     writeIconTheme
+    writeMimePackage
+    hasMimePackage
     systemdRenderedUnits
     enabledServiceNames
     hasServices

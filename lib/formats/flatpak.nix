@@ -87,6 +87,7 @@ let
           - if [ -d opt/${meta.name}/share ]; then cp -a opt/${meta.name}/share/. /app/share/; fi
           - if [ -d usr/share/applications ]; then install -Dm644 usr/share/applications/* /app/share/applications/ 2>/dev/null || true; fi
           - if [ -d usr/share/icons ]; then cp -a usr/share/icons /app/share/ 2>/dev/null || true; fi
+          - if [ -d usr/share/mime/packages ]; then install -Dm644 -t /app/share/mime/packages usr/share/mime/packages/*; fi
     ${extraModulesYaml}
   '';
 

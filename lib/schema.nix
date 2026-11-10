@@ -174,6 +174,77 @@ let
     };
   };
 
+  fileAssociationModule = {
+    options = {
+      id = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = ''
+          Uniform Type Identifier on macOS and ProgID on Windows for an
+          exported type. Use the system UTI for well-known types
+          (`com.adobe.pdf`, `public.plain-text`). Required when `exported = true`.
+        '';
+        example = "org.example.hello.document";
+      };
+      name = mkOption {
+        type = types.str;
+        description = "Human-readable type name (`CFBundleTypeName`, MIME `<comment>`, Windows `FriendlyTypeName`).";
+        example = "Hello document";
+      };
+      extensions = mkOption {
+        type = types.listOf types.str;
+        default = [ ];
+        description = "File extensions without the leading dot.";
+        example = [ "hello" ];
+      };
+      mimeTypes = mkOption {
+        type = types.listOf types.str;
+        default = [ ];
+        description = "MIME types of the type. Linux matches desktop entries to files by these.";
+        example = [ "application/x-hello" ];
+      };
+      role = mkOption {
+        type = types.enum [
+          "viewer"
+          "editor"
+        ];
+        default = "viewer";
+        description = "Whether the app only opens (`viewer`) or also saves (`editor`) the type. macOS `CFBundleTypeRole`.";
+      };
+      rank = mkOption {
+        type = types.enum [
+          "owner"
+          "default"
+          "alternate"
+        ];
+        default = "alternate";
+        description = ''
+          How strongly the app claims the type. macOS `LSHandlerRank`; on
+          Windows `owner` also makes the app the default handler of every
+          extension, the other ranks only add it to "Open with".
+        '';
+      };
+      exported = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          The app defines this type. macOS gets a `UTExportedTypeDeclarations`
+          entry and Linux a shared-mime-info package declaring the MIME types
+          with their extension globs.
+        '';
+      };
+      conformsTo = mkOption {
+        type = types.listOf types.str;
+        default = [ "public.data" ];
+        description = "macOS only: parent UTIs of a declared type (`UTTypeConformsTo`).";
+        example = [
+          "public.data"
+          "public.content"
+        ];
+      };
+    };
+  };
+
   systemdOverridesModule = {
     options = {
       unitOverrides = mkOption {
@@ -832,6 +903,47 @@ in
       description = "Declarative XDG Desktop Entry definitions to ship on linux bundles. The first entry is also used as the AppImage top-level `.desktop`.";
     };
 
+    fileAssociations = mkOption {
+      type = types.listOf (types.submodule fileAssociationModule);
+      default = [ ];
+      description = ''
+        File types the app opens, so installed bundles show it under "Open
+        with" and claim the types it defines.
+
+        - linux: every MIME type joins `MimeType=` of the desktop entries that
+          set no `mimeTypes` of their own (`%F` is appended to an `exec`
+          without a field code), and exported types ship
+          `/usr/share/mime/packages/<bundleId>.xml`.
+        - macOS `.app` (and dmg, pkg, productbuild): `CFBundleDocumentTypes`,
+          plus `UTExportedTypeDeclarations` for exported types and
+          `UTImportedTypeDeclarations` for other non-system ids.
+        - Windows (MSI, NSIS): one ProgID per association with
+          `shell\open\command`, listed under `OpenWithProgids` of every
+          extension, and the extension default when `rank = "owner"`.
+          The ProgID is `id` for exported types, `<bundleId>.<first extension>`
+          otherwise.
+      '';
+      example = literalExpression ''
+        [
+          {
+            id = "org.example.hello.document";
+            name = "Hello document";
+            extensions = [ "hello" ];
+            mimeTypes = [ "application/x-hello" ];
+            role = "editor";
+            rank = "owner";
+            exported = true;
+          }
+          {
+            id = "com.adobe.pdf";
+            name = "PDF document";
+            extensions = [ "pdf" ];
+            mimeTypes = [ "application/pdf" ];
+          }
+        ]
+      '';
+    };
+
     services = mkOption {
       type = types.listOf (types.submodule serviceModule);
       default = [ ];
@@ -1140,6 +1252,19 @@ in
       {
         assertion = lib.all (e: e.name != "" && e.exec != "") config.desktopEntries;
         message = "Every entry in info.desktopEntries must set non-empty `name` and `exec`.";
+      }
+      {
+        assertion = lib.all (a: !a.exported || (a.id != null && a.id != "")) config.fileAssociations;
+        message =
+          "info.fileAssociations: exported types need an `id` (their UTI / ProgID), missing on: "
+          + lib.concatMapStringsSep ", " (a: "'${a.name}'") (
+            builtins.filter (a: a.exported && (a.id == null || a.id == "")) config.fileAssociations
+          )
+          + ".";
+      }
+      {
+        assertion = lib.all (a: lib.all (e: !lib.hasPrefix "." e) a.extensions) config.fileAssociations;
+        message = "info.fileAssociations: write `extensions` without the leading dot (\"pdf\", not \".pdf\").";
       }
       {
         assertion =

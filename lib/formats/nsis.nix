@@ -49,6 +49,8 @@ let
   # Installed next to the binary: shortcuts and "Apps & features" use it.
   iconRel = "${meta.name}.ico";
 
+  fileAssociations = import ../file-associations.nix { inherit lib; };
+
   nsi = ''
     !define APPNAME "${meta.name}"
     !define DISPLAYNAME "${meta.displayName}"
@@ -100,6 +102,8 @@ let
         if hasIcon then iconRel else "${meta.name}.exe"
       }" 0
 
+      ${fileAssociations.nsisInstall meta}
+
       ${lib.optionalString hasServices ''
         ; Register Windows services declared in info.services
         nsExec::ExecToLog '"$INSTDIR\\install-services.bat"'
@@ -113,6 +117,7 @@ let
       Delete "$INSTDIR\\${uninstallerName}"
       RMDir /r "$INSTDIR"
       Delete "$SMPROGRAMS\\$\{DISPLAYNAME}.lnk"
+      ${fileAssociations.nsisUninstall meta}
       DeleteRegKey HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$\{APPNAME}"
       DeleteRegKey HKLM "Software\\$\{APPNAME}"
     SectionEnd
@@ -167,6 +172,11 @@ stdenv.mkDerivation {
 
   passthru = {
     info = meta;
-    inherit target format outFile;
+    inherit
+      target
+      format
+      outFile
+      nsi
+      ;
   };
 }
