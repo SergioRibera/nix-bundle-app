@@ -69,6 +69,8 @@ let
     else
       lib.concatMapStringsSep "\n" (m: "  - " + builtins.toJSON m) fp.extraModules;
 
+  # Desktop entries name `/opt/<name>/bin/…`; in the sandbox the binaries
+  # are in `/app/bin`, on PATH, so `Exec`/`TryExec` keep the bare name.
   manifestYaml = ''
     app-id: ${appId}
     runtime: ${fp.runtime}
@@ -89,8 +91,9 @@ let
           - if [ -d opt/${meta.name}/bin ]; then cp -a opt/${meta.name}/bin/. /app/bin/; fi
           - if [ -d opt/${meta.name}/lib ]; then cp -a opt/${meta.name}/lib/. /app/lib/; fi
           - if [ -d opt/${meta.name}/share ]; then cp -a opt/${meta.name}/share/. /app/share/; fi
-          - if [ -d usr/share/applications ]; then install -Dm644 usr/share/applications/* /app/share/applications/ 2>/dev/null || true; fi
-          - if [ -d usr/share/icons ]; then cp -a usr/share/icons /app/share/ 2>/dev/null || true; fi
+          - if [ -d usr/share/applications ]; then install -Dm644 -t /app/share/applications usr/share/applications/*; fi
+          - if [ -d /app/share/applications ]; then sed -i 's|=/opt/${meta.name}/bin/|=|' /app/share/applications/*.desktop; fi
+          - if [ -d usr/share/icons ]; then cp -a usr/share/icons /app/share/; fi
           - if [ -d usr/share/mime/packages ]; then install -Dm644 -t /app/share/mime/packages usr/share/mime/packages/*; fi
           - if [ -d usr/share/metainfo ]; then install -Dm644 -t /app/share/metainfo usr/share/metainfo/*; fi
     ${extraModulesYaml}

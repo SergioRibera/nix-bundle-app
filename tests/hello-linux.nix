@@ -122,6 +122,10 @@ in
     assertScript = ''
       grep -qx '  - --share=network' "$artifact"
       grep -qF 'install -Dm644 -t /app/share/metainfo' "$artifact"
+      # appstream compose needs the desktop entry installed and runnable
+      # from /app/bin.
+      grep -qF 'install -Dm644 -t /app/share/applications' "$artifact"
+      grep -qF "sed -i 's|=/opt/" "$artifact"
     '';
   };
 
