@@ -72,6 +72,24 @@ in
     '';
   };
 
+  # The synthesized AppImage entry takes `%U` like a declared one.
+  url-schemes-appimage = e2e {
+    name = "url-schemes-appimage";
+    format = "appimage";
+    inherit drv;
+    info = removeAttrs schemeInfo [ "desktopEntries" ];
+    expect = "*.AppImage";
+    probeInputs = [ pkgs.squashfsTools ];
+    assertScript = ''
+      tmp=$(mktemp -d)
+      for offset in $(grep -abo 'hsqs' "$artifact" | cut -d: -f1); do
+        if unsquashfs -q -o "$offset" -d "$tmp/root" "$artifact" >/dev/null 2>&1; then break; fi
+      done
+      grep -qx "Exec=hello %U" "$tmp/root/hello.desktop"
+      grep -qx "MimeType=x-scheme-handler/hello;x-scheme-handler/hello-dev;" "$tmp/root/hello.desktop"
+    '';
+  };
+
   url-schemes-plist =
     pkgs.runCommand "e2e-url-schemes-plist"
       {

@@ -70,7 +70,8 @@ let
     else
       {
         name = meta.displayName;
-        exec = "${meta.name} %F";
+        # `withMimeTypes` adds `%F` or `%U` when the app opens files or links.
+        exec = meta.name;
         comment = if meta.summary != "" then meta.summary else meta.displayName;
         icon = if meta.iconSet != null then meta.iconName else meta.name;
         categories = [ "Utility" ];
