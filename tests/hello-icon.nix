@@ -10,6 +10,7 @@ let
     info
     pkgs
     canNsis
+    canRpm
     ;
   inherit (pkgs) lib;
 
@@ -100,6 +101,27 @@ in
       msiinfo export "$artifact" Property | grep -F "ARPPRODUCTICON"
       msiinfo export "$artifact" Property | grep -P "ProductName\tHello World"
       msiinfo export "$artifact" Shortcut | grep -F "AppIcon.ico"
+    '';
+  };
+}
+// lib.optionalAttrs canRpm {
+  # rpm lists its files explicitly; every size `info.icon` stages must be in it.
+  icon-rpm = e2e {
+    name = "icon-rpm";
+    format = "rpm";
+    inherit drv;
+    info = iconInfo;
+    expect = "hello-*-1.x86_64.rpm";
+    probeInputs = [
+      pkgs.rpm
+      pkgs.cpio
+    ];
+    assertScript = ''
+      tmp=$(mktemp -d)
+      ( cd "$tmp" && rpm2cpio "$artifact" | cpio -idm --quiet )
+      for s in 16 32 48 256 512; do
+        test -f "$tmp/usr/share/icons/hicolor/''${s}x''${s}/apps/org.example.Hello.png"
+      done
     '';
   };
 }

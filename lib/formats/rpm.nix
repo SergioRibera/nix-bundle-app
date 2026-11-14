@@ -50,7 +50,8 @@ let
   group = meta.depends.rpmGroup or "Applications/System";
 
   hasEntries = meta.desktopEntries != [ ];
-  hasIcons = lib.any (e: e.iconPath != null) meta.desktopEntries;
+  # `info.icon` stages every hicolor size; an entry's `iconPath` adds 512x512.
+  hasIcons = meta.iconSet != null || lib.any (e: e.iconPath != null) meta.desktopEntries;
 in
 stdenv.mkDerivation {
   name = "${meta.name}-${meta.version}-1.${meta.rpmArch}.rpm";
@@ -132,7 +133,7 @@ stdenv.mkDerivation {
       echo "/usr/bin/*"
       ${lib.optionalString (common.hasServices meta) ''echo "%attr(0644, root, root) /lib/systemd/system/*"''}
       ${lib.optionalString hasEntries ''echo "/usr/share/applications/*"''}
-      ${lib.optionalString hasIcons ''echo "/usr/share/icons/hicolor/512x512/apps/*"''}
+      ${lib.optionalString hasIcons ''echo "/usr/share/icons/hicolor/*/apps/*"''}
       ${lib.optionalString (common.hasMimePackage meta) ''echo "/usr/share/mime/packages/*"''}
       ${lib.concatMapStringsSep "\n      " (p: ''echo "${p}"'') (common.extraFilesPaths meta)}
       echo
