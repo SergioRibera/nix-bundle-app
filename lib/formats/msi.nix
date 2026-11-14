@@ -39,9 +39,12 @@ let
   winArch = if target.arch == "x86_64" then "x64" else target.arch;
   outFile = "${meta.name}-${meta.version}-${winArch}.msi";
 
+  win = meta.windows;
+  perUser = win.scope == "perUser";
+
   upgradeCode =
-    if meta.msiUpgradeCode or null != null then
-      meta.msiUpgradeCode
+    if win.upgradeCode != null then
+      win.upgradeCode
     else
       let
         h = builtins.hashString "md5" meta.bundleId;
@@ -60,6 +63,82 @@ let
   fileAssociations = import ../file-associations.nix { inherit lib; };
   assocComponent = fileAssociations.wixComponent meta;
 
+  # Inbound allow rules for the declared ports, added after the files land and
+  # dropped before they go. netsh comes from the system PATH (CustomAction
+  # type 50); rules need admin, so per-user installs get none.
+  local = meta.permissions.network.local;
+  firewallRules = lib.optionals (local != null && !perUser) (
+    lib.optional (local.udp != [ ]) {
+      id = "Udp";
+      protocol = "UDP";
+      ports = local.udp;
+    }
+    ++ lib.optional (local.tcp != [ ]) {
+      id = "Tcp";
+      protocol = "TCP";
+      ports = local.tcp;
+    }
+  );
+  ruleName = esc meta.displayName;
+  firewallXml = lib.optionalString (firewallRules != [ ]) ''
+    <Property Id="NETSH" Value="netsh.exe"/>
+    ${lib.concatMapStrings (r: ''
+      <CustomAction Id="FirewallAdd${r.id}" Property="NETSH" Execute="deferred" Impersonate="no" Return="ignore"
+                    ExeCommand="advfirewall firewall add rule name=&quot;${ruleName}&quot; dir=in action=allow protocol=${r.protocol} localport=${
+                      lib.concatMapStringsSep "," toString r.ports
+                    } program=&quot;[INSTALLFOLDER]${esc meta.name}.exe&quot; enable=yes"/>
+    '') firewallRules}
+    <CustomAction Id="FirewallRemove" Property="NETSH" Execute="deferred" Impersonate="no" Return="ignore"
+                  ExeCommand="advfirewall firewall delete rule name=&quot;${ruleName}&quot;"/>
+    <InstallExecuteSequence>
+      ${lib.concatMapStrings (r: ''
+        <Custom Action="FirewallAdd${r.id}" After="InstallFiles">NOT Installed</Custom>
+      '') firewallRules}
+      <Custom Action="FirewallRemove" Before="RemoveFiles">REMOVE="ALL"</Custom>
+    </InstallExecuteSequence>
+  '';
+
+  arpProperties = lib.filterAttrs (_: v: v != null && v != "") {
+    ARPURLINFOABOUT = meta.homepage;
+    ARPHELPLINK = win.arp.helpUrl;
+    ARPURLUPDATEINFO = win.arp.updateUrl;
+    ARPCONTACT = win.arp.contact;
+    ARPCOMMENTS = win.arp.comments;
+  };
+
+  # Shortcut components need a registry KeyPath; HKCU is what Windows
+  # Installer expects for shortcuts.
+  shortcutComponent = id: dir: ''
+    <DirectoryRef Id="${dir}">
+      <Component Id="${id}" Guid="*">
+        <Shortcut Id="${id}Link"
+                  Name="${esc meta.displayName}"
+                  Description="${esc meta.summary}"
+                  Target="[INSTALLFOLDER]${esc meta.name}.exe"
+                  ${lib.optionalString hasIcon ''Icon="AppIcon.ico"''}
+                  WorkingDirectory="INSTALLFOLDER"/>
+        ${lib.optionalString (
+          dir == "ApplicationProgramsFolder"
+        ) ''<RemoveFolder Id="RemoveAppMenuFolder" On="uninstall"/>''}
+        <RegistryValue Root="HKCU"
+                       Key="Software\${esc meta.name}"
+                       Name="${id}"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes"/>
+      </Component>
+    </DirectoryRef>
+  '';
+  shortcuts =
+    lib.optional win.shortcuts.startMenu {
+      id = "ApplicationShortcut";
+      dir = "ApplicationProgramsFolder";
+    }
+    ++ lib.optional win.shortcuts.desktop {
+      id = "DesktopShortcut";
+      dir = "DesktopFolder";
+    };
+
   wxs = ''
     <?xml version="1.0" encoding="UTF-8"?>
     <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
@@ -67,51 +146,55 @@ let
                Name="${esc meta.displayName}"
                Language="1033"
                Version="${esc meta.numericVersion}"
-               Manufacturer="${esc meta.maintainer}"
+               Manufacturer="${esc meta.publisher}"
                UpgradeCode="${upgradeCode}">
         <Package InstallerVersion="200"
                  Compressed="yes"
-                 InstallScope="perMachine"
+                 InstallScope="${win.scope}"
                  ${msiArchAttr}
                  Description="${esc meta.summary}"
-                 Manufacturer="${esc meta.maintainer}"/>
+                 Manufacturer="${esc meta.publisher}"/>
         <MajorUpgrade DowngradeErrorMessage="A newer version of ${esc meta.displayName} is already installed."/>
         <MediaTemplate EmbedCab="yes"/>
         ${lib.optionalString hasIcon ''
           <Icon Id="AppIcon.ico" SourceFile="app-icon.ico"/>
           <Property Id="ARPPRODUCTICON" Value="AppIcon.ico"/>
         ''}
+        ${lib.concatStrings (
+          lib.mapAttrsToList (k: v: ''
+            <Property Id="${k}" Value="${esc v}"/>
+          '') arpProperties
+        )}
 
         <Directory Id="TARGETDIR" Name="SourceDir">
-          <Directory Id="${programFilesId}">
-            <Directory Id="INSTALLFOLDER" Name="${esc meta.installDirName}"/>
-          </Directory>
+          ${
+            if perUser then
+              ''
+                <Directory Id="LocalAppDataFolder">
+                  <Directory Id="UserProgramsFolder" Name="Programs">
+                    <Directory Id="INSTALLFOLDER" Name="${esc meta.installDirName}"/>
+                  </Directory>
+                </Directory>
+              ''
+            else
+              ''
+                <Directory Id="${programFilesId}">
+                  <Directory Id="INSTALLFOLDER" Name="${esc meta.installDirName}"/>
+                </Directory>
+              ''
+          }
           <Directory Id="ProgramMenuFolder">
             <Directory Id="ApplicationProgramsFolder" Name="${esc meta.displayName}"/>
           </Directory>
+          <Directory Id="DesktopFolder"/>
         </Directory>
 
-        <DirectoryRef Id="ApplicationProgramsFolder">
-          <Component Id="ApplicationShortcut" Guid="*">
-            <Shortcut Id="AppShortcut"
-                      Name="${esc meta.displayName}"
-                      Description="${esc meta.summary}"
-                      Target="[INSTALLFOLDER]${esc meta.name}.exe"
-                      ${lib.optionalString hasIcon ''Icon="AppIcon.ico"''}
-                      WorkingDirectory="INSTALLFOLDER"/>
-            <RemoveFolder Id="RemoveAppMenuFolder" On="uninstall"/>
-            <RegistryValue Root="HKCU"
-                           Key="Software\${esc meta.name}"
-                           Name="installed"
-                           Type="integer"
-                           Value="1"
-                           KeyPath="yes"/>
-          </Component>
-        </DirectoryRef>
+        ${lib.concatMapStrings (s: shortcutComponent s.id s.dir) shortcuts}
         ${assocComponent}
+        ${firewallXml}
         <Feature Id="MainFeature" Title="${esc meta.displayName}" Level="1">
           <ComponentGroupRef Id="MainComponents"/>
-          <ComponentRef Id="ApplicationShortcut"/>
+          ${lib.concatMapStrings (s: ''<ComponentRef Id="${s.id}"/>'') shortcuts}
           ${lib.optionalString (assocComponent != "") ''<ComponentRef Id="FileAssociations"/>''}
         </Feature>
       </Product>

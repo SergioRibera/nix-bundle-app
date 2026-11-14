@@ -54,7 +54,14 @@ let
         archVersion = withPrerelease "_";
         bundleId =
           if cfg.bundleId != null then cfg.bundleId else "com.example.${utils.sanitizeName cfg.name}";
-        installDirName = if cfg.installDirName != null then cfg.installDirName else cfg.name;
+        installDirName =
+          if cfg.windows.installDirName != null then cfg.windows.installDirName else cfg.name;
+        # "Name <email>" reads badly in "Apps & features"; keep the name.
+        publisher =
+          if cfg.windows.publisher != null then
+            cfg.windows.publisher
+          else
+            lib.trim (builtins.head (lib.splitString "<" cfg.maintainer));
         displayName = if cfg.displayName != null then cfg.displayName else cfg.name;
         appBundleName = "${if cfg.displayName != null then cfg.displayName else cfg.name}.app";
         inherit target format;

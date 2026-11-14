@@ -165,6 +165,32 @@ info.macos = {
 
 `Info.plist` is generated with `lib.generators.toPlist`, so every value is escaped. `macOsIcon`, `bundleSignature` and `minimumSystemVersion` moved to `macos.icns`, `macos.bundleSignature` and `macos.minimumSystemVersion`; the old names still work and print a deprecation warning.
 
+### Windows: install scope, shortcuts, "Apps & features"
+
+`info.windows` holds the settings both Windows installers (`msi`, `nsis`) share:
+
+```nix
+info.windows = {
+  publisher = "Example Corp";          # default: maintainer without the <email>
+  scope = "perUser";                   # default "perMachine"
+  shortcuts = { startMenu = true; desktop = true; };
+  arp = { helpUrl = "…"; updateUrl = "…"; contact = "…"; comments = "…"; };
+  installDirName = "Hello";            # default: name
+  upgradeCode = "…GUID…";              # MSI only; pin it for released artifacts
+};
+info.permissions.network.local = { reason = "…"; udp = [ 7701 ]; tcp = [ ]; };
+```
+
+| Setting | `perMachine` | `perUser` |
+| --- | --- | --- |
+| Install dir | `%ProgramFiles%\<installDirName>` | `%LOCALAPPDATA%\Programs\<installDirName>` |
+| Admin prompt | yes | no |
+| Registry, shortcuts, file associations | HKLM, all users | HKCU, current user |
+| `permissions.network.local` ports | inbound firewall rule per protocol, removed on uninstall | no rule (needs admin, warning at eval); Windows asks on first run |
+| `services` | installed | rejected at eval |
+
+`installDirName` and `msiUpgradeCode` moved to `windows.installDirName` and `windows.upgradeCode`; the old names still work and print a deprecation warning.
+
 ### Extra system files (linux installer formats)
 
 `info.extraFiles` drops arbitrary files into the staged tree at fixed install paths — udev rules, modprobe.d snippets, modules-load.d, polkit policies, AppArmor profiles, anything that needs to land outside `/opt/<name>`. Honoured by `deb`, `rpm`, `archlinux`.
@@ -201,7 +227,7 @@ Set `info.autoDepends = false` to fall back to literal user lists.
 - **`pkg`** (macOS): flat `.pkg` (xar). Without services the `.app` goes to `/Applications/<name>.app`. With services, `install-location="/"` and a `postinstall` script `launchctl load -w`s each plist. Linux host uses `xar+cpio+bomutils`; darwin host uses `pkgbuild`.
 - **`productbuild`**: distribution-style installer wrapping the component `pkg`. `info.productbuild = { welcome; license; readme; conclusion; background; title; organization; allowCustomize; }` controls the screens. On darwin runs real `productbuild`; on linux hand-assembles the outer xar (Distribution + Resources + component pkg).
 - **`brew`**: works on **macOS and linuxbrew**. Produces `Formula.rb` + `.tar.gz`. Darwin + `info.services` gets a `service do … end` block (launchd integration).
-- **`msi`**: `msitools`' `wixl`. `UpgradeCode` derived from `bundleId` — pin `info.msiUpgradeCode` for released artifacts. Services materialise as native `<ServiceInstall>` + `<ServiceControl>` (no `.bat`).
+- **`msi`**: `msitools`' `wixl`. `UpgradeCode` derived from `bundleId` — pin `info.windows.upgradeCode` for released artifacts. Services materialise as native `<ServiceInstall>` + `<ServiceControl>` (no `.bat`).
 - **`dmg`** on linux: HFS+ hybrid ISO via `xorrisofs -hfsplus` (not a byte-identical UDIF DMG; Finder mounts it fine).
 - **`flatpak`**: emits a build-ready source layout (`<bundleId>.yaml` manifest + `<name>-<ver>.tar.gz` source tarball + `build.sh` helper). Doesn't produce the final `.flatpak` itself — that requires network access to fetch runtimes, which Nix sandbox forbids. Run `./build.sh` on a flatpak-builder-capable host (it shells out to `flatpak-builder --repo=repo build <appid>.yaml && flatpak build-bundle …`). Tune sandbox permissions with `info.flatpak.finishArgs`, runtime via `info.flatpak.runtime{,Version}`.
 - **`snap`**: emits a `snap/snapcraft.yaml` + staged `payload/` + `build.sh` helper. Real `.snap` requires `snapcraft pack` which spins an LXD/multipass VM — not viable inside Nix sandbox. Run `./build.sh` on a snapcraft-enabled host. Tune confinement via `info.snap.confinement` (`strict`/`classic`/`devmode`), interfaces via `info.snap.plugs`, base via `info.snap.base` (`core22` ↔ Ubuntu 22.04).
@@ -303,7 +329,7 @@ Signers used: `rcodesign` (macOS, cross-platform), `osslsigncode` (Authenticode)
 
 ## Validation
 
-`info` runs through `lib.evalModules` (same machinery as NixOS modules) before any derivation builds. Typos, type mismatches, missing required fields, and cross-field assertions (e.g. `format = "appimage"` + `info.services != []`, or a malformed `msiUpgradeCode`) fail at `nix-instantiate` time with helpful "Did you mean …?" hints.
+`info` runs through `lib.evalModules` (same machinery as NixOS modules) before any derivation builds. Typos, type mismatches, missing required fields, and cross-field assertions (e.g. `format = "appimage"` + `info.services != []`, or a malformed `windows.upgradeCode`) fail at `nix-instantiate` time with helpful "Did you mean …?" hints.
 
 ## Docs
 

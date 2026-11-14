@@ -863,15 +863,130 @@ let
   };
 
   localNetworkModule = {
-    options.reason = mkOption {
-      type = types.str;
-      description = ''
-        Why the app talks to devices on the local network, shown in the
-        permission prompt. macOS (`NSLocalNetworkUsageDescription`): without
-        it the system refuses LAN traffic without asking, and sockets fail
-        with "No route to host".
-      '';
-      example = "Finds and streams from apps running on your network.";
+    options = {
+      reason = mkOption {
+        type = types.str;
+        description = ''
+          Why the app talks to devices on the local network, shown in the
+          permission prompt. macOS (`NSLocalNetworkUsageDescription`): without
+          it the system refuses LAN traffic without asking, and sockets fail
+          with "No route to host".
+        '';
+        example = "Finds and streams from apps running on your network.";
+      };
+      udp = mkOption {
+        type = types.listOf types.port;
+        default = [ ];
+        description = ''
+          UDP ports the app receives on. Windows: the MSI and NSIS installers
+          add inbound firewall rules for them (machine-wide installs only),
+          so Defender neither blocks nor asks on first run.
+        '';
+        example = [ 7701 ];
+      };
+      tcp = mkOption {
+        type = types.listOf types.port;
+        default = [ ];
+        description = "TCP ports the app listens on; like `udp`.";
+        example = [ 8080 ];
+      };
+    };
+  };
+
+  windowsShortcutsModule = {
+    options = {
+      startMenu = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Start-menu shortcut.";
+      };
+      desktop = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Desktop shortcut.";
+      };
+    };
+  };
+
+  windowsArpModule = {
+    options = {
+      helpUrl = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Support link (`HelpLink` / `ARPHELPLINK`).";
+      };
+      updateUrl = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Where updates are published (`URLUpdateInfo` / `ARPURLUPDATEINFO`).";
+      };
+      contact = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Support contact (`Contact` / `ARPCONTACT`).";
+      };
+      comments = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Free text (`Comments` / `ARPCOMMENTS`).";
+      };
+    };
+  };
+
+  windowsModule = {
+    options = {
+      installDirName = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = ''
+          Install directory name: under `%ProgramFiles%`, or under
+          `%LOCALAPPDATA%\Programs` for a per-user install. Defaults to `name`.
+        '';
+      };
+      upgradeCode = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = ''
+          Pinned `UpgradeCode` GUID for the MSI. Derived deterministically from
+          `bundleId` if null — **pin this once you cut a release**, otherwise
+          future MSIs won't be recognised as upgrades.
+        '';
+        example = "12345678-90AB-CDEF-1234-567890ABCDEF";
+      };
+      publisher = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = ''
+          Shown as the publisher in "Apps & features" and the MSI
+          `Manufacturer`. Defaults to `maintainer` without the `<email>`.
+        '';
+        example = "Acme Inc.";
+      };
+      scope = mkOption {
+        type = types.enum [
+          "perMachine"
+          "perUser"
+        ];
+        default = "perMachine";
+        description = ''
+          `perMachine`: `%ProgramFiles%`, needs admin, for every user.
+          `perUser`: `%LOCALAPPDATA%\Programs`, no admin prompt, for the
+          installing user only (firewall rules need admin, so none are added).
+        '';
+      };
+      shortcuts = mkOption {
+        type = types.submodule windowsShortcutsModule;
+        default = { };
+        description = "Shortcuts the installers create.";
+      };
+      arp = mkOption {
+        type = types.submodule windowsArpModule;
+        default = { };
+        description = ''
+          Extra "Apps & features" (Add/Remove Programs) fields. `homepage`
+          already fills the about link.
+        '';
+      };
     };
   };
 
@@ -887,12 +1002,14 @@ let
   };
 in
 {
-  # The macOS-only options moved under `macos`; the old names keep working
-  # with a deprecation warning.
+  # The macOS- and Windows-only options moved under `macos` and `windows`;
+  # the old names keep working with a deprecation warning.
   imports = [
     (lib.mkRenamedOptionModule [ "macOsIcon" ] [ "macos" "icns" ])
     (lib.mkRenamedOptionModule [ "bundleSignature" ] [ "macos" "bundleSignature" ])
     (lib.mkRenamedOptionModule [ "minimumSystemVersion" ] [ "macos" "minimumSystemVersion" ])
+    (lib.mkRenamedOptionModule [ "installDirName" ] [ "windows" "installDirName" ])
+    (lib.mkRenamedOptionModule [ "msiUpgradeCode" ] [ "windows" "upgradeCode" ])
   ];
 
   options = {
@@ -1215,10 +1332,10 @@ in
       '';
     };
 
-    installDirName = mkOption {
-      type = types.nullOr types.str;
-      default = null;
-      description = "Windows install-dir name under `%ProgramFiles%`. Defaults to `name` when null.";
+    windows = mkOption {
+      type = types.submodule windowsModule;
+      default = { };
+      description = "Windows-only settings for the MSI and NSIS installers.";
     };
 
     downloadUrl = mkOption {
@@ -1244,17 +1361,6 @@ in
       type = types.bool;
       default = false;
       description = "If true, the AppImage's bundled `.desktop` sets `Terminal=true` (CLI tools).";
-    };
-
-    msiUpgradeCode = mkOption {
-      type = types.nullOr types.str;
-      default = null;
-      description = ''
-        Pinned `UpgradeCode` GUID for the MSI. Derived deterministically from
-        `bundleId` if null — **pin this once you cut a release**, otherwise
-        future MSIs won't be recognised as upgrades.
-      '';
-      example = "12345678-90AB-CDEF-1234-567890ABCDEF";
     };
 
     depends = mkOption {
@@ -1327,7 +1433,40 @@ in
   };
 
   config = {
+    warnings =
+      let
+        local = config.permissions.network.local;
+        ports = local != null && (local.udp != [ ] || local.tcp != [ ]);
+      in
+      lib.optional
+        (
+          builtins.elem format [
+            "msi"
+            "nsis"
+            "exe"
+          ]
+          && ports
+          && config.windows.scope == "perUser"
+        )
+        (
+          "permissions.network.local ports get no firewall rules in a per-user install "
+          + "(they need admin); Windows asks the user on first run instead."
+        );
+
     assertions = [
+      {
+        assertion =
+          !(
+            builtins.elem format [
+              "msi"
+              "nsis"
+              "exe"
+            ]
+            && config.services != [ ]
+            && config.windows.scope == "perUser"
+          );
+        message = "info.services need admin to install; use windows.scope = \"perMachine\".";
+      }
       {
         assertion = config.name != "";
         message = "info.name must be a non-empty string.";
@@ -1380,13 +1519,13 @@ in
       }
       {
         assertion =
-          config.msiUpgradeCode == null
+          config.windows.upgradeCode == null
           ||
-            builtins.match "[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}" config.msiUpgradeCode
+            builtins.match "[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}" config.windows.upgradeCode
             != null;
         message =
-          "info.msiUpgradeCode must be a GUID of shape "
-          + "'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX' (got '${toString config.msiUpgradeCode}').";
+          "info.windows.upgradeCode must be a GUID of shape "
+          + "'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX' (got '${toString config.windows.upgradeCode}').";
       }
       {
         assertion = config.macos.entitlements == { } || config.signing.darwin.entitlements == null;

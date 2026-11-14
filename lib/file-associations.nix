@@ -110,8 +110,8 @@ let
       progId = if a.exported then a.id else "${meta.bundleId}.${builtins.head a.extensions}";
     }) (builtins.filter (a: a.extensions != [ ]) (meta.fileAssociations or [ ]));
 
-  # `<Component>` for the MSI, written under HKCR (HKLM\Software\Classes in
-  # this per-machine install). Windows Installer drops the values on
+  # `<Component>` for the MSI, written under HKCR (HKLM\Software\Classes
+  # per machine, HKCU\Software\Classes per user). Windows Installer drops the values on
   # uninstall.
   wixComponent =
     meta:
@@ -166,8 +166,8 @@ let
       + "</DirectoryRef>\n"
     );
 
-  # NSIS install/uninstall lines, under HKLM\Software\Classes like the rest
-  # of this per-machine installer. Uninstall only clears an extension's
+  # NSIS install/uninstall lines under SHCTX\Software\Classes: HKLM or HKCU,
+  # whichever `SetShellVarContext` the installer picked. Uninstall only clears an extension's
   # default when it still points at our ProgID.
   # NSIS string literal: `$` starts a variable, `$\"` is a quote.
   nsisEsc = utils.nsisEscape;
@@ -183,14 +183,14 @@ let
           key = "Software\\Classes\\${p.progId}";
         in
         ''
-          WriteRegStr HKLM "${key}" "" "${nsisEsc p.name}"
-          WriteRegStr HKLM "${key}" "FriendlyTypeName" "${nsisEsc p.name}"
-          WriteRegStr HKLM "${key}\DefaultIcon" "" "${exe},0"
-          WriteRegStr HKLM "${key}\shell\open\command" "" '"${exe}" "%1"'
+          WriteRegStr SHCTX "${key}" "" "${nsisEsc p.name}"
+          WriteRegStr SHCTX "${key}" "FriendlyTypeName" "${nsisEsc p.name}"
+          WriteRegStr SHCTX "${key}\DefaultIcon" "" "${exe},0"
+          WriteRegStr SHCTX "${key}\shell\open\command" "" '"${exe}" "%1"'
         ''
         + lib.concatMapStrings (e: ''
-          WriteRegStr HKLM "Software\Classes\.${e}\OpenWithProgids" "${p.progId}" ""
-          ${lib.optionalString p.owner ''WriteRegStr HKLM "Software\Classes\.${e}" "" "${p.progId}"''}
+          WriteRegStr SHCTX "Software\Classes\.${e}\OpenWithProgids" "${p.progId}" ""
+          ${lib.optionalString p.owner ''WriteRegStr SHCTX "Software\Classes\.${e}" "" "${p.progId}"''}
         '') p.extensions;
     in
     lib.optionalString (progIds != [ ]) (
@@ -205,15 +205,15 @@ let
       progId =
         p:
         lib.concatMapStrings (e: ''
-          DeleteRegValue HKLM "Software\Classes\.${e}\OpenWithProgids" "${p.progId}"
+          DeleteRegValue SHCTX "Software\Classes\.${e}\OpenWithProgids" "${p.progId}"
           ${lib.optionalString p.owner ''
-            ReadRegStr $0 HKLM "Software\Classes\.${e}" ""
+            ReadRegStr $0 SHCTX "Software\Classes\.${e}" ""
             StrCmp $0 "${p.progId}" 0 +2
-            DeleteRegValue HKLM "Software\Classes\.${e}" ""
+            DeleteRegValue SHCTX "Software\Classes\.${e}" ""
           ''}
         '') p.extensions
         + ''
-          DeleteRegKey HKLM "Software\Classes\${p.progId}"
+          DeleteRegKey SHCTX "Software\Classes\${p.progId}"
         '';
     in
     lib.optionalString (progIds != [ ]) (

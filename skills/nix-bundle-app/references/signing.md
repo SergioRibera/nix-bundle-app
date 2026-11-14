@@ -80,4 +80,4 @@ The generated `sign.sh` signs only; it does not notarize. Notarize the signed `.
 - `signing.darwin.p12File` and `signing.windows.pkcs12File` are nix paths — they end up in `/nix/store` (the file, *not* the password). That's fine for cert files (public) but **never put the password in `info`**.
 - `signing.linux.style = "embedded"` only works for `deb` (via `dpkg-sig`) and `rpm` (via `rpmsign`). For other formats it silently falls back to detached `.sig`.
 - `bundleId` and `info.maintainer` must match the cert subject for some windows CAs (DigiCert etc.) — otherwise `signtool` complains.
-- `msiUpgradeCode` — sign-related but for upgrades: pin a UUID before publishing any MSI; signing won't help if the upgrade code changes between releases.
+- `windows.upgradeCode` (was `msiUpgradeCode`) — sign-related but for upgrades: pin a UUID before publishing any MSI; signing won't help if the upgrade code changes between releases.

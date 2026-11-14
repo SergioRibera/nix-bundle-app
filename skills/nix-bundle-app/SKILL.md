@@ -95,7 +95,7 @@ Wildcards (`tar.gz`, `tar.xz`, `tar.zst`, `zip`) are host-agnostic. `brew` works
 - `bundleId` (reverse-DNS, default `com.example.<name>`; also flatpak id, icon name and MSI upgrade seed)
 
 **Layout**:
-- `binDir = "bin"`, `libDir = "lib"`, `installDirName = name`
+- `binDir = "bin"`, `libDir = "lib"`
 
 **Dependencies**:
 - `autoDepends = true` — scan staged binaries with `patchelf --print-needed`, map SONAMEs via `lib/lib-map.nix`, merge into `depends`. Auto-detected entries never override user ones.
@@ -111,14 +111,14 @@ Wildcards (`tar.gz`, `tar.xz`, `tar.zst`, `zip`) are host-agnostic. `brew` works
 **Extra system files** (linux installer formats only) — `extraFiles = { "/lib/udev/rules.d/61-foo.rules" = ./foo.rules; "/etc/modprobe.d/foo.conf" = "options foo bar=1\n"; }`. Keys are absolute install paths, values are Nix paths/store paths or inline strings. Honoured by `deb`, `rpm`, `archlinux`; ignored by `appimage`, `flatpak`, `snap` (no system install location). When any key lands under a known udev rules dir, the post-install hook also runs `udevadm control --reload-rules && udevadm trigger`.
 
 **Format-specific**:
-- `msiUpgradeCode` — pin a UUID for released MSIs (otherwise derived from `bundleId`).
+- `windows = { scope ("perMachine" | "perUser"); publisher; installDirName; upgradeCode; shortcuts.{startMenu,desktop}; arp.{helpUrl,updateUrl,contact,comments}; }` for msi + nsis. Pin `upgradeCode` (a UUID) for released MSIs. Old `installDirName` / `msiUpgradeCode` still work with a warning.
 - `appImageRuntime`, `appImageTerminal`.
 - `flatpak.{runtime,runtimeVersion,sdk,command,finishArgs,extraModules}`.
 - `snap.{base,confinement,grade,plugs,summary}`.
 - `archlinux.output = "pkg" | "aur" | "both"` (default `"both"`).
 - `productbuild = { welcome; license; readme; conclusion; background; title; organization; allowCustomize; }`.
 - `macos = { icns; minimumSystemVersion; bundleSignature; category; copyright; buildVersion; infoPlist; entitlements; }` (the old flat `macOsIcon` / `minimumSystemVersion` / `bundleSignature` still work, with a warning).
-- `permissions.network.local.reason`: macOS local-network prompt text.
+- `permissions.network.local = { reason; udp; tcp; }`: macOS local-network prompt text; Windows firewall rules for the ports (perMachine only).
 
 **Other**:
 - `downloadUrl` — used by archlinux AUR `source=()` + `sha256sums=()`.
@@ -279,7 +279,7 @@ Full env-var matrix in `references/signing.md`.
 - **`pkg`** (macOS) — flat `.pkg` (xar). Without services, the `.app` lands in `/Applications/<name>.app`. With services, `install-location="/"` + a `postinstall` that `launchctl load -w`s each plist. Linux host uses `xar+cpio+bomutils`; darwin host uses `pkgbuild`.
 - **`productbuild`** — distribution-style installer wrapping the component `pkg`. `info.productbuild` controls welcome/license/readme/conclusion/background screens. On darwin: real `productbuild`; on linux: hand-assembles the outer xar.
 - **`brew`** — works on macOS *and* linuxbrew. Produces `Formula.rb` + `.tar.gz`. Darwin + `info.services` gets a `service do … end` block.
-- **`msi`** — uses `msitools`' `wixl`. `UpgradeCode` derived from `bundleId` — **pin `info.msiUpgradeCode` for released artifacts** or upgrades break. Services materialise natively, no `.bat`.
+- **`msi`** — uses `msitools`' `wixl`. `UpgradeCode` derived from `bundleId` — **pin `info.windows.upgradeCode` for released artifacts** or upgrades break. Services materialise natively, no `.bat`.
 - **`dmg`** on linux — HFS+ hybrid ISO via `xorrisofs -hfsplus`. Not a byte-identical UDIF DMG; Finder mounts fine.
 - **`flatpak`** — emits build-ready layout (`<bundleId>.yaml` + source tarball + `build.sh`). **No final `.flatpak`** — needs network to fetch runtimes, forbidden in Nix sandbox. Run `./build.sh` on a flatpak-builder host.
 - **`snap`** — emits `snap/snapcraft.yaml` + `payload/` + `build.sh`. Real `.snap` needs `snapcraft pack` which spins an LXD/multipass VM. Run `./build.sh` on a snapcraft host.
@@ -301,13 +301,13 @@ More detail per format: `references/formats.md`.
 - **`mkbom`** (bomutils 0.2 in nixpkgs) crashes under modern glibc FORTIFY. Linux-built `.pkg` falls back to an empty Bom — most installers tolerate it. Build on darwin for a compliant Bom.
 - **AppImage runtime** is pinned to a numbered type2-runtime release (`runtimeRelease` in `lib/formats/appimage.nix`); pass your own via `info.appImageRuntime` to override.
 - **SONAME map** is curated, not exhaustive. Add unknowns via `info.depends.<distro>`.
-- **`msiUpgradeCode`** — leaving it derived from `bundleId` is fine for first release but locks you in. Pin a UUID before publishing.
+- **`windows.upgradeCode`** (was `msiUpgradeCode`) — leaving it derived from `bundleId` is fine for first release but locks you in. Pin a UUID before publishing.
 - **`flatpak`/`snap`** never produce final artifacts inside Nix — they always need a post-build `./build.sh` step.
 - **Target mismatches fail the build, not silently**: deb/rpm/archlinux/appimage/app/dmg/pkg/productbuild/tar.gz/zip all verify the staged binary against `target.{os,arch}` via `file` before packing — e.g. accidentally bundling a darwin `drv` with `target.os = "linux"` errors out instead of shipping a broken artifact. `msi`/`nsis` can't be checked this way (binary is embedded in the installer container).
 
 ## Validation & tests
 
-- `info` runs through `lib.evalModules` before any derivation builds. Typos and cross-field assertions (`format = "appimage"` + non-empty `info.services` is rejected, malformed `msiUpgradeCode` rejected, etc.) fail at `nix-instantiate` time.
+- `info` runs through `lib.evalModules` before any derivation builds. Typos and cross-field assertions (`format = "appimage"` + non-empty `info.services` is rejected, malformed `windows.upgradeCode` rejected, etc.) fail at `nix-instantiate` time.
 - `nix-build tests` builds every format against `pkgs.hello` + a sample Rust binary, verifies filenames + payload sanity.
 - `nix run nixpkgs#nixfmt-rfc-style -- $(git ls-files '*.nix')` formats the tree.
 - `nix-build lib/docs.nix` regenerates `docs/options.md` from the schema.

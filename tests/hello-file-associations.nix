@@ -195,10 +195,10 @@ in
       nsi=${pkgs.writeText "installer.nsi" nsi}
       grep -qF 'Software\Classes\org.example.hello.document\shell\open\command" ""' "$nsi"
       grep -qF '"$INSTDIR\hello.exe" "%1"' "$nsi"
-      grep -qF 'WriteRegStr HKLM "Software\Classes\.hello" "" "org.example.hello.document"' "$nsi"
-      grep -qF 'WriteRegStr HKLM "Software\Classes\.pdf\OpenWithProgids" "org.example.Hello.pdf" ""' "$nsi"
-      if grep -qF 'WriteRegStr HKLM "Software\Classes\.pdf" ""' "$nsi"; then exit 1; fi
-      grep -qF 'DeleteRegKey HKLM "Software\Classes\org.example.hello.document"' "$nsi"
+      grep -qF 'WriteRegStr SHCTX "Software\Classes\.hello" "" "org.example.hello.document"' "$nsi"
+      grep -qF 'WriteRegStr SHCTX "Software\Classes\.pdf\OpenWithProgids" "org.example.Hello.pdf" ""' "$nsi"
+      if grep -qF 'WriteRegStr SHCTX "Software\Classes\.pdf" ""' "$nsi"; then exit 1; fi
+      grep -qF 'DeleteRegKey SHCTX "Software\Classes\org.example.hello.document"' "$nsi"
       grep -qF 'StrCmp $0 "org.example.hello.document" 0 +2' "$nsi"
     '';
   };

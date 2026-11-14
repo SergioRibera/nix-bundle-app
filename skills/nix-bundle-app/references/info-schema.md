@@ -22,7 +22,6 @@ Canonical schema lives in `lib/schema.nix`; this is a hand-curated quick-lookup.
 |-------|------|---------|---------|
 | `binDir` | str | `"bin"` | Where bin/ sits inside the staged tree. |
 | `libDir` | str | `"lib"` | Where libs sit. `$ORIGIN/../lib` rpath assumes this. |
-| `installDirName` | str | `name` | Top-level directory name (e.g. `/opt/<installDirName>` on linux). |
 
 ## Dependencies
 
@@ -106,7 +105,13 @@ Per-OS overrides only fill gaps the generic struct can't express:
 | `macos.infoPlist` | darwin formats | Extra `Info.plist` keys (attrset), applied last. |
 | `macos.entitlements` | darwin signing | Entitlements attrset embedded in `sign.sh`; exclusive with `signing.darwin.entitlements`. |
 | `permissions.network.local.reason` | darwin formats | `NSLocalNetworkUsageDescription`; without it macOS blocks LAN traffic silently. |
-| `msiUpgradeCode` | msi | Pin a stable UUID for released MSIs. Leaving it derived from `bundleId` is fine for first release but locks you in. |
+| `permissions.network.local.udp`, `.tcp` | msi/nsis | Ports (list of int) that get an inbound firewall rule in a `perMachine` install. |
+| `windows.upgradeCode` | msi | Pin a stable UUID for released MSIs. Leaving it derived from `bundleId` is fine for first release but locks you in. Was `msiUpgradeCode`. |
+| `windows.installDirName` | msi/nsis | Install folder name, default `name`. Was `installDirName`. |
+| `windows.scope` | msi/nsis | `"perMachine"` (default: Program Files, admin, HKLM) or `"perUser"` (`%LOCALAPPDATA%\Programs`, no admin, HKCU; no firewall rules, no services). |
+| `windows.publisher` | msi/nsis | Manufacturer / Publisher, default `maintainer` without the email. |
+| `windows.shortcuts.startMenu`, `.desktop` | msi/nsis | bools, default `true` / `false`. |
+| `windows.arp.{helpUrl,updateUrl,contact,comments}` | msi/nsis | Extra "Apps & features" fields. |
 
 ## Misc
 
@@ -121,4 +126,4 @@ Per-OS overrides only fill gaps the generic struct can't express:
 - Don't set `name` or `version` manually unless they differ from the drv — easy to drift.
 - `desktopEntries.*.icon` (string) without `iconPath` (file) means you rely on the system having the icon already.
 - `services.*.type = "notify"` on systemd needs the binary to call `sd_notify`.
-- `msiUpgradeCode` must be a UUID — schema enforces format.
+- `windows.upgradeCode` must be a UUID — schema enforces format.

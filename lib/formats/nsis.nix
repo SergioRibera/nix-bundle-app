@@ -35,7 +35,14 @@ let
       rsync
       ;
   };
+  win = meta.windows;
+  perUser = win.scope == "perUser";
   installDirName = meta.installDirName;
+  # Per user: no admin, %LOCALAPPDATA%\Programs and HKCU, like MSI's perUser.
+  regRoot = if perUser then "HKCU" else "HKLM";
+  shellContext = if perUser then "current" else "all";
+  installRoot = if perUser then "$LOCALAPPDATA\\Programs" else "$PROGRAMFILES64";
+  uninstallKey = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\\${APPNAME}";
   winArch = if target.arch == "x86_64" then "x64" else target.arch;
   outFile = "${meta.name}-${meta.version}-${winArch}-setup.exe";
 
@@ -48,15 +55,44 @@ let
   hasIcon = meta.iconSet != null;
   # Installed next to the binary: shortcuts and "Apps & features" use it.
   iconRel = "${meta.name}.ico";
+  shortcutIcon = "$INSTDIR\\${if hasIcon then iconRel else exeRel}";
 
   fileAssociations = import ../file-associations.nix { inherit lib; };
   esc = utils.nsisEscape;
+
+  arpValues = lib.filterAttrs (_: v: v != null && v != "") {
+    HelpLink = win.arp.helpUrl;
+    URLUpdateInfo = win.arp.updateUrl;
+    Contact = win.arp.contact;
+    Comments = win.arp.comments;
+  };
+
+  # Same rules as the MSI: inbound allow for the declared ports, admin only.
+  local = meta.permissions.network.local;
+  firewallRules = lib.optionals (local != null && !perUser) (
+    lib.optional (local.udp != [ ]) {
+      protocol = "UDP";
+      ports = local.udp;
+    }
+    ++ lib.optional (local.tcp != [ ]) {
+      protocol = "TCP";
+      ports = local.tcp;
+    }
+  );
+  firewallAdd = lib.concatMapStrings (r: ''
+    nsExec::ExecToLog 'netsh advfirewall firewall add rule name="''${DISPLAYNAME}" dir=in action=allow protocol=${r.protocol} localport=${
+      lib.concatMapStringsSep "," toString r.ports
+    } program="$INSTDIR\${exeRel}" enable=yes'
+  '') firewallRules;
+  firewallRemove = lib.optionalString (firewallRules != [ ]) ''
+    nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="''${DISPLAYNAME}"'
+  '';
 
   nsi = ''
     !define APPNAME "${esc meta.name}"
     !define DISPLAYNAME "${esc meta.displayName}"
     !define APPVERSION "${esc meta.version}"
-    !define COMPANYNAME "${esc meta.maintainer}"
+    !define COMPANYNAME "${esc meta.publisher}"
     !define DESCRIPTION "${esc meta.summary}"
     !define HOMEPAGE "${esc meta.homepage}"
 
@@ -66,9 +102,9 @@ let
       UninstallIcon "payload\${iconRel}"
     ''}
     OutFile "${outFile}"
-    InstallDir "$PROGRAMFILES64\${installDirName}"
-    InstallDirRegKey HKLM "Software\''${APPNAME}" "Install_Dir"
-    RequestExecutionLevel admin
+    InstallDir "${installRoot}\${esc installDirName}"
+    InstallDirRegKey ${regRoot} "Software\''${APPNAME}" "Install_Dir"
+    RequestExecutionLevel ${if perUser then "user" else "admin"}
     SetCompressor /SOLID lzma
     Unicode true
 
@@ -78,34 +114,37 @@ let
     UninstPage instfiles
 
     Section "Install"
-      ; HKLM, admin and $PROGRAMFILES: the Start-menu shortcut is machine-wide too.
-      SetShellVarContext all
+      ; Shortcuts and SHCTX follow the install scope.
+      SetShellVarContext ${shellContext}
       SetOutPath "$INSTDIR"
       File /r "payload\*"
 
-      WriteRegStr HKLM "Software\''${APPNAME}" "Install_Dir" "$INSTDIR"
-      WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\''${APPNAME}" \
-                       "DisplayName" "''${DISPLAYNAME}"
+      WriteRegStr ${regRoot} "Software\''${APPNAME}" "Install_Dir" "$INSTDIR"
+      WriteRegStr ${regRoot} "${uninstallKey}" "DisplayName" "''${DISPLAYNAME}"
       ${lib.optionalString hasIcon ''
-        WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\''${APPNAME}" \
-                         "DisplayIcon" "$INSTDIR\${iconRel}"
+        WriteRegStr ${regRoot} "${uninstallKey}" "DisplayIcon" "$INSTDIR\${iconRel}"
       ''}
-      WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\''${APPNAME}" \
-                       "DisplayVersion" "''${APPVERSION}"
-      WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\''${APPNAME}" \
-                       "Publisher" "''${COMPANYNAME}"
-      WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\''${APPNAME}" \
-                       "URLInfoAbout" "''${HOMEPAGE}"
-      WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\''${APPNAME}" \
-                       "UninstallString" '"$INSTDIR\${uninstallerName}"'
+      WriteRegStr ${regRoot} "${uninstallKey}" "DisplayVersion" "''${APPVERSION}"
+      WriteRegStr ${regRoot} "${uninstallKey}" "Publisher" "''${COMPANYNAME}"
+      WriteRegStr ${regRoot} "${uninstallKey}" "URLInfoAbout" "''${HOMEPAGE}"
+      ${lib.concatStrings (
+        lib.mapAttrsToList (k: v: ''
+          WriteRegStr ${regRoot} "${uninstallKey}" "${k}" "${esc v}"
+        '') arpValues
+      )}
+      WriteRegStr ${regRoot} "${uninstallKey}" "UninstallString" '"$INSTDIR\${uninstallerName}"'
 
       WriteUninstaller "$INSTDIR\${uninstallerName}"
 
-      CreateShortCut "$SMPROGRAMS\''${DISPLAYNAME}.lnk" "$INSTDIR\${meta.name}.exe" "" "$INSTDIR\${
-        if hasIcon then iconRel else "${meta.name}.exe"
-      }" 0
+      ${lib.optionalString win.shortcuts.startMenu ''
+        CreateShortCut "$SMPROGRAMS\''${DISPLAYNAME}.lnk" "$INSTDIR\${exeRel}" "" "${shortcutIcon}" 0
+      ''}
+      ${lib.optionalString win.shortcuts.desktop ''
+        CreateShortCut "$DESKTOP\''${DISPLAYNAME}.lnk" "$INSTDIR\${exeRel}" "" "${shortcutIcon}" 0
+      ''}
 
       ${fileAssociations.nsisInstall meta}
+      ${firewallAdd}
 
       ${lib.optionalString hasServices ''
         ; Register Windows services declared in info.services
@@ -114,16 +153,18 @@ let
     SectionEnd
 
     Section "Uninstall"
-      SetShellVarContext all
+      SetShellVarContext ${shellContext}
       ${lib.optionalString hasServices ''
         nsExec::ExecToLog '"$INSTDIR\uninstall-services.bat"'
       ''}
+      ${firewallRemove}
       Delete "$INSTDIR\${uninstallerName}"
       RMDir /r "$INSTDIR"
       Delete "$SMPROGRAMS\''${DISPLAYNAME}.lnk"
+      Delete "$DESKTOP\''${DISPLAYNAME}.lnk"
       ${fileAssociations.nsisUninstall meta}
-      DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\''${APPNAME}"
-      DeleteRegKey HKLM "Software\''${APPNAME}"
+      DeleteRegKey ${regRoot} "${uninstallKey}"
+      DeleteRegKey ${regRoot} "Software\''${APPNAME}"
     SectionEnd
   '';
 in

@@ -8,7 +8,7 @@ Read the entry for whichever format you're producing. Each section lists: requir
 - Host: any (linux preferred — no special tooling on darwin).
 - Tool: `dpkg-deb`.
 - Output: `<name>_<version>_<arch>.deb` (arch = `amd64`/`arm64`).
-- Layout: payload at `/opt/<installDirName>`, symlinks in `/usr/bin/`.
+- Layout: payload at `/opt/<name>`, symlinks in `/usr/bin/`.
 - Maintainer scripts: `postinst` enables systemd services; `prerm`/`postrm` clean up. Also runs `udevadm control --reload-rules && udevadm trigger` when `info.extraFiles` writes under `/lib/udev/rules.d/`.
 - `info.depends.deb` merged with auto-detected SONAME deps.
 - `info.extraFiles` materialises raw system files (udev rules, modprobe.d snippets, modules-load.d, …) at the destination paths inside the package.
@@ -85,7 +85,7 @@ Read the entry for whichever format you're producing. Each section lists: requir
 ### `msi`
 - Tool: `msitools`' `wixl`.
 - Output: `<Name>-<version>-<arch>.msi`.
-- `UpgradeCode` derived from `bundleId` — **pin `info.msiUpgradeCode` for released artifacts** or upgrades break across releases.
+- `UpgradeCode` derived from `bundleId` — **pin `info.windows.upgradeCode` for released artifacts** or upgrades break across releases.
 - Services materialise as native `<ServiceInstall>` + `<ServiceControl>` (no `.bat`).
 
 ## host-agnostic wildcards

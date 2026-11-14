@@ -26,7 +26,7 @@
       "id": 4,
       "name": "signed-msi-with-service",
       "prompt": "I need to ship a Windows MSI of my sync agent. The drv (cross-compiled with mingwW64) is at `pkgs.pkgsCross.mingwW64.sync-agent`. I want it to install a Windows service that runs the agent on boot (auto-start), and the MSI needs to be Authenticode-signed with my cert at `./certs/auth.pfx`. The cert password will come from an env var. Also, I plan to ship updates so the UpgradeCode must be stable. Give me the Nix snippet plus the command I'll run to sign.",
-      "expected_output": "Nix snippet calling bundler.bundle with format = \"msi\", target = { arch = \"x86_64\"; os = \"windows\"; }, an info.services entry with restart/exec for the agent, info.msiUpgradeCode pinned to a UUID, info.signing.windows.enable = true with pkcs12File pointing at the cert and timestampUrl set. Plus an explanation that signing runs after building the bundle via P12_PASSWORD=... ./result/sign.sh, or one-shot via bundler.signedApp (nix-build -A <name>-signed then run the resulting ./result/bin/<name>-sign).",
+      "expected_output": "Nix snippet calling bundler.bundle with format = \"msi\", target = { arch = \"x86_64\"; os = \"windows\"; }, an info.services entry with restart/exec for the agent, info.windows.upgradeCode pinned to a UUID, info.signing.windows.enable = true with pkcs12File pointing at the cert and timestampUrl set. Plus an explanation that signing runs after building the bundle via P12_PASSWORD=... ./result/sign.sh, or one-shot via bundler.signedApp (nix-build -A <name>-signed then run the resulting ./result/bin/<name>-sign).",
       "files": []
     }
   ]
