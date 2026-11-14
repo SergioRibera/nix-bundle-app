@@ -120,6 +120,22 @@ info.fileAssociations = [
 
 Distros refresh the MIME database from shared-mime-info's own package triggers, so the packages carry no `update-mime-database` hook. snap and brew ship no desktop integration, so they ignore the option.
 
+### URL schemes
+
+`info.urlSchemes` registers the app as the handler of `hello://…` links; a plain string is the scheme, a set can name it:
+
+```nix
+info.urlSchemes = [ "hello" { scheme = "hello-dev"; name = "Hello (dev)"; } ];
+```
+
+| Format | Output |
+|---|---|
+| deb / rpm / archlinux / tar.gz / flatpak / AppImage | `x-scheme-handler/<scheme>` added to `MimeType=` like the file associations; an `exec` with no field code gets `%U` (files then arrive as `file://` URIs) |
+| app / dmg / pkg / productbuild | `CFBundleURLTypes`, named `<bundleId>.<scheme>` |
+| MSI / NSIS | `Software\Classes\<scheme>` with `URL:<name>`, `URL Protocol`, `DefaultIcon` and `shell\open\command` (`"<exe>" "%1"`). Removed on uninstall |
+
+The app receives the URL as its first argument (linux, Windows) or as an Apple Event (macOS, `application:openURLs:`).
+
 ### One icon, one display name
 
 `info.icon` takes a single square PNG (1024 px recommended) and every format renders its own icon from it; `info.displayName` is the name people see, while `name` keeps driving paths, package names and registry keys:

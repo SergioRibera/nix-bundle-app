@@ -6,18 +6,26 @@ let
   utils = import ./utils.nix { inherit lib; };
   esc = utils.xmlEscape;
 
-  # Every MIME type the app opens, in declaration order.
-  mimeTypesOf = meta: lib.unique (lib.concatMap (a: a.mimeTypes) (meta.fileAssociations or [ ]));
+  # Every MIME type the app opens, in declaration order, then one
+  # `x-scheme-handler/<scheme>` per URL scheme.
+  mimeTypesOf =
+    meta:
+    lib.unique (
+      lib.concatMap (a: a.mimeTypes) (meta.fileAssociations or [ ])
+      ++ map (s: "x-scheme-handler/${s.scheme}") (meta.urlSchemes or [ ])
+    );
 
   # Without a field code the desktop launches the app without the file.
   hasFieldCode = exec: builtins.match ".*%[fFuU].*" exec != null;
 
   # Desktop entries that list no MIME types of their own take every
-  # association's; entries with explicit `mimeTypes` are left alone.
+  # association's and scheme's; entries with explicit `mimeTypes` are left
+  # alone. URLs need `%U`; files alone get `%F`.
   withMimeTypes =
     meta: entry:
     let
       mimes = mimeTypesOf meta;
+      fieldCode = if (meta.urlSchemes or [ ]) != [ ] then "%U" else "%F";
     in
     if mimes == [ ] || (entry.mimeTypes or [ ]) != [ ] then
       entry
@@ -25,7 +33,7 @@ let
       entry
       // {
         mimeTypes = mimes;
-        exec = if hasFieldCode entry.exec then entry.exec else "${entry.exec} %F";
+        exec = if hasFieldCode entry.exec then entry.exec else "${entry.exec} ${fieldCode}";
       };
 
   exportedOf = meta: builtins.filter (a: a.exported) (meta.fileAssociations or [ ]);

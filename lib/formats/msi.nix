@@ -61,7 +61,9 @@ let
   svcBinNames = builtins.attrNames svcXmlByBin;
 
   fileAssociations = import ../file-associations.nix { inherit lib; };
+  urlSchemes = import ../url-schemes.nix { inherit lib; };
   assocComponent = fileAssociations.wixComponent meta;
+  schemeComponent = urlSchemes.wixComponent meta;
 
   # Inbound allow rules for the declared ports, added after the files land and
   # dropped before they go. netsh comes from the system PATH (CustomAction
@@ -191,11 +193,13 @@ let
 
         ${lib.concatMapStrings (s: shortcutComponent s.id s.dir) shortcuts}
         ${assocComponent}
+        ${schemeComponent}
         ${firewallXml}
         <Feature Id="MainFeature" Title="${esc meta.displayName}" Level="1">
           <ComponentGroupRef Id="MainComponents"/>
           ${lib.concatMapStrings (s: ''<ComponentRef Id="${s.id}"/>'') shortcuts}
           ${lib.optionalString (assocComponent != "") ''<ComponentRef Id="FileAssociations"/>''}
+          ${lib.optionalString (schemeComponent != "") ''<ComponentRef Id="UrlSchemes"/>''}
         </Feature>
       </Product>
     </Wix>

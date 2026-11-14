@@ -47,6 +47,7 @@ let
   execName = meta.name;
   renderedServices = services.renderAllLaunchd meta.services;
   fileAssociations = import ../file-associations.nix { inherit lib; };
+  urlSchemes = import ../url-schemes.nix { inherit lib; };
 
   localNetwork = meta.permissions.network.local;
 
@@ -72,6 +73,7 @@ let
     NSLocalNetworkUsageDescription = localNetwork.reason;
   }
   // fileAssociations.plistKeys meta
+  // urlSchemes.plistKeys meta
   // mac.infoPlist;
 
   plist = lib.generators.toPlist { escape = true; } plistKeys;

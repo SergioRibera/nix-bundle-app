@@ -58,6 +58,7 @@ let
   shortcutIcon = "$INSTDIR\\${if hasIcon then iconRel else exeRel}";
 
   fileAssociations = import ../file-associations.nix { inherit lib; };
+  urlSchemes = import ../url-schemes.nix { inherit lib; };
   esc = utils.nsisEscape;
 
   arpValues = lib.filterAttrs (_: v: v != null && v != "") {
@@ -144,6 +145,7 @@ let
       ''}
 
       ${fileAssociations.nsisInstall meta}
+      ${urlSchemes.nsisInstall meta}
       ${firewallAdd}
 
       ${lib.optionalString hasServices ''
@@ -163,6 +165,7 @@ let
       Delete "$SMPROGRAMS\''${DISPLAYNAME}.lnk"
       Delete "$DESKTOP\''${DISPLAYNAME}.lnk"
       ${fileAssociations.nsisUninstall meta}
+      ${urlSchemes.nsisUninstall meta}
       DeleteRegKey ${regRoot} "${uninstallKey}"
       DeleteRegKey ${regRoot} "Software\''${APPNAME}"
     SectionEnd

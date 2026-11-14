@@ -63,6 +63,19 @@ let
           else
             lib.trim (builtins.head (lib.splitString "<" cfg.maintainer));
         displayName = if cfg.displayName != null then cfg.displayName else cfg.name;
+        urlSchemes = map (
+          s:
+          s
+          // {
+            name =
+              if s.name != null then
+                s.name
+              else if cfg.displayName != null then
+                cfg.displayName
+              else
+                cfg.name;
+          }
+        ) cfg.urlSchemes;
         appBundleName = "${if cfg.displayName != null then cfg.displayName else cfg.name}.app";
         inherit target format;
         debArch = utils.debArch target.arch;

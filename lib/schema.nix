@@ -174,6 +174,21 @@ let
     };
   };
 
+  urlSchemeModule = {
+    options = {
+      scheme = mkOption {
+        type = types.strMatching "[a-z][a-z0-9+.-]*";
+        example = "hello";
+        description = "URL scheme without `:` or `//`, e.g. `hello` for `hello://open?x=1`.";
+      };
+      name = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "What the scheme is, for the system's UI (`URL:<name>` on Windows). Defaults to `displayName`.";
+      };
+    };
+  };
+
   fileAssociationModule = {
     options = {
       id = mkOption {
@@ -1163,6 +1178,25 @@ in
           }
         ]
       '';
+    };
+
+    urlSchemes = mkOption {
+      type = types.listOf (
+        types.coercedTo types.str (scheme: { inherit scheme; }) (types.submodule urlSchemeModule)
+      );
+      default = [ ];
+      description = ''
+        URL schemes the app handles (`hello://…` links). A plain string is
+        the scheme.
+
+        - linux: `x-scheme-handler/<scheme>` joins `MimeType=` of the desktop
+          entries that set no `mimeTypes` of their own; an `exec` without a
+          field code gets `%U`, so files arrive as `file://` URIs too.
+        - macOS `.app` (and dmg, pkg, productbuild): `CFBundleURLTypes`.
+        - Windows (MSI, NSIS): `Software\Classes\<scheme>` with
+          `URL Protocol` and `shell\open\command` passing the URL as `%1`.
+      '';
+      example = literalExpression ''[ "hello" { scheme = "hello-dev"; name = "Hello (dev)"; } ]'';
     };
 
     services = mkOption {

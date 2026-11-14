@@ -106,6 +106,8 @@ Wildcards (`tar.gz`, `tar.xz`, `tar.zst`, `zip`) are host-agnostic. `brew` works
 
 **Desktop entries** (XDG `.desktop`) — `desktopEntries = [ { name; exec; categories; icon ? ; ... } ]`. Materialises on linux into `/usr/share/applications/<file>.desktop` + icons under `/usr/share/icons/hicolor/`. See `references/services-desktop.md`.
 
+**File types and links** — `fileAssociations = [ { id; name; extensions; mimeTypes; role; rank; exported; } ]` and `urlSchemes = [ "hello" { scheme; name; } ]`. Linux: `MimeType=` (+ `x-scheme-handler/<scheme>`, `%U`) on desktop entries without their own `mimeTypes`; macOS: `CFBundleDocumentTypes` / `CFBundleURLTypes`; Windows: ProgIDs and `URL Protocol` keys in MSI + NSIS.
+
 **Services** (cross-OS) — `services = [ { name; exec; description; ... } ]`. One struct → systemd unit (linux), launchd plist (`pkg`), NSIS `.bat`s or native MSI `<ServiceInstall>` (windows). See `references/services-desktop.md`.
 
 **Extra system files** (linux installer formats only) — `extraFiles = { "/lib/udev/rules.d/61-foo.rules" = ./foo.rules; "/etc/modprobe.d/foo.conf" = "options foo bar=1\n"; }`. Keys are absolute install paths, values are Nix paths/store paths or inline strings. Honoured by `deb`, `rpm`, `archlinux`; ignored by `appimage`, `flatpak`, `snap` (no system install location). When any key lands under a known udev rules dir, the post-install hook also runs `udevadm control --reload-rules && udevadm trigger`.
