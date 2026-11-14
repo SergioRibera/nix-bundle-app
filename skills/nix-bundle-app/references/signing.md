@@ -44,7 +44,7 @@ The script reads:
 
 | OS | Env vars |
 |----|----------|
-| darwin | `P12_PASSWORD` (required), `APPLE_ID` + `APPLE_TEAM_ID` + `NOTARIZATION_PASSWORD` (optional, for notarization). |
+| darwin | `P12_FILE` (defaults to `signing.darwin.p12File`), `P12_PASSWORD` (prompted when unset), `TEAM_ID` (defaults to `signing.darwin.teamId`). |
 | windows | `P12_PASSWORD` (required for the PKCS12). |
 | linux | `GPG_KEY_ID` (required, overrides `info.signing.linux.keyId` if set). |
 
@@ -73,7 +73,7 @@ Use this in CI so signing is one command instead of two-step `build` → `./resu
 
 ## Notarization (macOS)
 
-`rcodesign` handles notarization when given Apple ID credentials. The generated `sign.sh` calls `rcodesign notary-submit` when `APPLE_ID` + `NOTARIZATION_PASSWORD` are set in the env, then `rcodesign notary-staple`. Skip the env vars to sign without notarizing.
+The generated `sign.sh` signs only; it does not notarize. Notarize the signed `.app`, `.dmg` or `.pkg` yourself with `rcodesign notary-submit` and an App Store Connect API key (see `rcodesign notary-submit --help`), then staple the ticket with `rcodesign staple`.
 
 ## Gotchas
 
