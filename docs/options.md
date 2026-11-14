@@ -54,6 +54,158 @@ false
 
 
 
+## appstream
+
+
+
+AppStream metainfo at ` /usr/share/metainfo/<bundleId>.metainfo.xml `,
+the listing GNOME Software, KDE Discover and Flathub show: id,
+names, description (blank lines split paragraphs), license,
+developer (` windows.publisher `’s default: ` maintainer ` without the
+email), homepage, launchable desktop entry, release and screenshots\.
+Shipped by deb, rpm, archlinux, tar, flatpak and AppImage\.
+
+
+
+*Type:*
+submodule
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+## appstream\.enable
+
+
+
+Ship the metainfo file\. Defaults to on when ` desktopEntries ` is non-empty\.
+
+
+
+*Type:*
+null or boolean
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## appstream\.metadataLicense
+
+
+
+SPDX license of the metainfo file itself (` metadata_license `)\. Flathub accepts CC0-1\.0, CC-BY-\*, FSFAP and MIT\.
+
+
+
+*Type:*
+string
+
+
+
+*Default:*
+
+```nix
+"CC0-1.0"
+```
+
+
+
+## appstream\.releaseDate
+
+
+
+Date of this ` version ` (` YYYY-MM-DD `)\. Without it the metainfo lists no release, since AppStream needs one per release and a build has no reproducible “today”\.
+
+
+
+*Type:*
+null or string matching the pattern \[0-9]{4}-\[0-9]{2}-\[0-9]{2}
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+*Example:*
+
+```nix
+"2026-11-14"
+```
+
+
+
+## appstream\.screenshots
+
+
+
+Screenshots for software centers; the first is the default one\.
+
+
+
+*Type:*
+list of (submodule)
+
+
+
+*Default:*
+
+```nix
+[ ]
+```
+
+
+
+## appstream\.screenshots\.\*\.caption
+
+
+
+Short caption\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## appstream\.screenshots\.\*\.image
+
+
+
+Public URL of the screenshot\.
+
+
+
+*Type:*
+string
+
+
+
 ## archlinux
 
 
@@ -150,7 +302,9 @@ string
 
 
 
-macOS ` CFBundleIdentifier `\. Defaults to ` com.example.<name> ` when null\.
+Reverse-DNS app id: macOS ` CFBundleIdentifier `, flatpak app id, icon
+and MIME package name on linux, and the seed of the MSI ` UpgradeCode `\.
+Defaults to ` com.example.<name> ` when null\.
 
 
 
@@ -207,27 +361,6 @@ boolean
 
 ```nix
 true
-```
-
-
-
-## bundleSignature
-
-
-
-macOS ` CFBundleSignature ` (4-char OSType code)\.
-
-
-
-*Type:*
-string
-
-
-
-*Default:*
-
-```nix
-"????"
 ```
 
 
@@ -1722,27 +1855,6 @@ null
 
 
 
-## installDirName
-
-
-
-Windows install-dir name under ` %ProgramFiles% `\. Defaults to ` name ` when null\.
-
-
-
-*Type:*
-null or string
-
-
-
-*Default:*
-
-```nix
-null
-```
-
-
-
 ## keepInterpreter
 
 
@@ -1835,11 +1947,174 @@ drv.meta.longDescription or drv.meta.description
 
 
 
-## macOsIcon
+## macos
 
 
 
-Path to a ` .icns ` icon file\. Copied into ` Contents/Resources/AppIcon.icns ` and referenced by ` CFBundleIconFile `\.
+macOS-only settings: the ` .app ` bundle’s ` Info.plist `, icon override and entitlements\.
+
+
+
+*Type:*
+submodule
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+## macos\.buildVersion
+
+
+
+` CFBundleVersion `, the build number\. Defaults to the numeric
+` version `, which is always ` CFBundleShortVersionString `\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+*Example:*
+
+```nix
+"42"
+```
+
+
+
+## macos\.bundleSignature
+
+
+
+` CFBundleSignature ` (4-char OSType code), also written to ` PkgInfo `\.
+
+
+
+*Type:*
+string
+
+
+
+*Default:*
+
+```nix
+"????"
+```
+
+
+
+## macos\.category
+
+
+
+` LSApplicationCategoryType `: where Finder and the App Store file the app\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+*Example:*
+
+```nix
+"public.app-category.developer-tools"
+```
+
+
+
+## macos\.copyright
+
+
+
+` NSHumanReadableCopyright `, shown in the About window and in Finder\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+*Example:*
+
+```nix
+"© 2026 Acme Inc."
+```
+
+
+
+## macos\.entitlements
+
+
+
+Code-signing entitlements, rendered to a plist that ` sign.sh ` embeds\.
+Leave empty to use ` signing.darwin.entitlements ` (a file) instead;
+setting both is an error\.
+
+
+
+*Type:*
+attribute set of anything
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+*Example:*
+
+```nix
+{ "com.apple.security.network.client" = true; }
+
+```
+
+
+
+## macos\.icns
+
+
+
+` .icns ` that replaces the one rendered from ` icon `\. Copied into
+` Contents/Resources/AppIcon.icns ` and referenced by ` CFBundleIconFile `\.
 
 
 
@@ -1860,6 +2135,62 @@ null
 
 ```nix
 ./assets/app.icns
+```
+
+
+
+## macos\.infoPlist
+
+
+
+Extra ` Info.plist ` keys for anything without its own option\. Applied
+last, so they override generated keys\. Values are strings, booleans,
+integers, lists and attribute sets (dictionaries)\.
+
+
+
+*Type:*
+attribute set of anything
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+*Example:*
+
+```nix
+{
+  LSUIElement = true;
+  NSSupportsAutomaticGraphicsSwitching = true;
+}
+
+```
+
+
+
+## macos\.minimumSystemVersion
+
+
+
+` LSMinimumSystemVersion `\.
+
+
+
+*Type:*
+string
+
+
+
+*Default:*
+
+```nix
+"10.13"
 ```
 
 
@@ -1893,58 +2224,6 @@ string
 
 
 
-## minimumSystemVersion
-
-
-
-macOS minimum system version (` LSMinimumSystemVersion `)\.
-
-
-
-*Type:*
-string
-
-
-
-*Default:*
-
-```nix
-"10.13"
-```
-
-
-
-## msiUpgradeCode
-
-
-
-Pinned ` UpgradeCode ` GUID for the MSI\. Derived deterministically from
-` bundleId ` if null — **pin this once you cut a release**, otherwise
-future MSIs won’t be recognised as upgrades\.
-
-
-
-*Type:*
-null or string
-
-
-
-*Default:*
-
-```nix
-null
-```
-
-
-
-*Example:*
-
-```nix
-"12345678-90AB-CDEF-1234-567890ABCDEF"
-```
-
-
-
 ## name
 
 
@@ -1970,6 +2249,144 @@ drv.pname or drv.name or "app"
 
 ```nix
 "my-app"
+```
+
+
+
+## permissions
+
+
+
+What the app needs from the system, declared once\. Each format turns
+it into its own form: usage descriptions in the macOS ` Info.plist `\.
+
+
+
+*Type:*
+submodule
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+## permissions\.network\.local
+
+
+
+The app reaches devices on the local network: LAN broadcast or
+multicast discovery, or connections to other hosts on the LAN\.
+
+ - macOS bundles: ` NSLocalNetworkUsageDescription ` from ` reason `\.
+ - Windows (MSI, NSIS, per machine): an inbound firewall rule for
+   ` udp ` / ` tcp ` ports, removed on uninstall\.
+ - flatpak: ` --share=network `; snap: ` network `, plus ` network-bind `
+   when ports are declared\.
+
+
+
+*Type:*
+null or (submodule)
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## permissions\.network\.local\.reason
+
+
+
+Why the app talks to devices on the local network, shown in the
+permission prompt\. macOS (` NSLocalNetworkUsageDescription `): without
+it the system refuses LAN traffic without asking, and sockets fail
+with “No route to host”\.
+
+
+
+*Type:*
+string
+
+
+
+*Example:*
+
+```nix
+"Finds and streams from apps running on your network."
+```
+
+
+
+## permissions\.network\.local\.tcp
+
+
+
+TCP ports the app listens on; like ` udp `\.
+
+
+
+*Type:*
+list of 16 bit unsigned integer; between 0 and 65535 (both inclusive)
+
+
+
+*Default:*
+
+```nix
+[ ]
+```
+
+
+
+*Example:*
+
+```nix
+[
+  8080
+]
+```
+
+
+
+## permissions\.network\.local\.udp
+
+
+
+UDP ports the app receives on\. Windows: the MSI and NSIS installers
+add inbound firewall rules for them (machine-wide installs only),
+so Defender neither blocks nor asks on first run\.
+
+
+
+*Type:*
+list of 16 bit unsigned integer; between 0 and 65535 (both inclusive)
+
+
+
+*Default:*
+
+```nix
+[ ]
+```
+
+
+
+*Example:*
+
+```nix
+[
+  7701
+]
 ```
 
 
@@ -2082,8 +2499,6 @@ null
 
 
 ## productbuild\.license
-
-
 
 Path to a license file shown on the License screen\.
 
@@ -2441,6 +2856,8 @@ null
 
 
 ## services\.\*\.launchd\.processType
+
+
 
 Plist ` ProcessType `\.
 
@@ -3501,6 +3918,85 @@ drv.meta.description or ""
 
 
 
+## urlSchemes
+
+
+
+URL schemes the app handles (` hello://… ` links)\. A plain string is
+the scheme\.
+
+ - linux: ` x-scheme-handler/<scheme> ` joins ` MimeType= ` of the desktop
+   entries that set no ` mimeTypes ` of their own; an ` exec ` without a
+   field code gets ` %U `, so files arrive as ` file:// ` URIs too\.
+ - macOS ` .app ` (and dmg, pkg, productbuild): ` CFBundleURLTypes `\.
+ - Windows (MSI, NSIS): ` Software\Classes\<scheme> ` with
+   ` URL Protocol ` and ` shell\open\command ` passing the URL as ` %1 `\.
+
+
+
+*Type:*
+list of ((submodule) or string convertible to it)
+
+
+
+*Default:*
+
+```nix
+[ ]
+```
+
+
+
+*Example:*
+
+```nix
+[ "hello" { scheme = "hello-dev"; name = "Hello (dev)"; } ]
+```
+
+
+
+## urlSchemes\.\*\.name
+
+
+
+What the scheme is, for the system’s UI (` URL:<name> ` on Windows)\. Defaults to ` displayName `\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## urlSchemes\.\*\.scheme
+
+
+
+URL scheme without ` : ` or ` // `, e\.g\. ` hello ` for ` hello://open?x=1 `\.
+
+
+
+*Type:*
+string matching the pattern \[a-z]\[a-z0-9+\.-]\*
+
+
+
+*Example:*
+
+```nix
+"hello"
+```
+
+
+
 ## version
 
 
@@ -3526,6 +4022,302 @@ drv.version or "0.0.0"
 
 ```nix
 "1.2.3"
+```
+
+
+
+## windows
+
+
+
+Windows-only settings for the MSI and NSIS installers\.
+
+
+
+*Type:*
+submodule
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+## windows\.arp
+
+
+
+Extra “Apps \& features” (Add/Remove Programs) fields\. ` homepage `
+already fills the about link\.
+
+
+
+*Type:*
+submodule
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+## windows\.arp\.comments
+
+
+
+Free text (` Comments ` / ` ARPCOMMENTS `)\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## windows\.arp\.contact
+
+
+
+Support contact (` Contact ` / ` ARPCONTACT `)\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## windows\.arp\.helpUrl
+
+
+
+Support link (` HelpLink ` / ` ARPHELPLINK `)\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## windows\.arp\.updateUrl
+
+
+
+Where updates are published (` URLUpdateInfo ` / ` ARPURLUPDATEINFO `)\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## windows\.installDirName
+
+
+
+Install directory name: under ` %ProgramFiles% `, or under
+` %LOCALAPPDATA%\Programs ` for a per-user install\. Defaults to ` name `\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+## windows\.publisher
+
+
+
+Shown as the publisher in “Apps \& features” and the MSI
+` Manufacturer `\. Defaults to ` maintainer ` without the ` <email> `\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+*Example:*
+
+```nix
+"Acme Inc."
+```
+
+
+
+## windows\.scope
+
+
+
+` perMachine `: ` %ProgramFiles% `, needs admin, for every user\.
+` perUser `: ` %LOCALAPPDATA%\Programs `, no admin prompt, for the
+installing user only (firewall rules need admin, so none are added)\.
+
+
+
+*Type:*
+one of “perMachine”, “perUser”
+
+
+
+*Default:*
+
+```nix
+"perMachine"
+```
+
+
+
+## windows\.shortcuts
+
+
+
+Shortcuts the installers create\.
+
+
+
+*Type:*
+submodule
+
+
+
+*Default:*
+
+```nix
+{ }
+```
+
+
+
+## windows\.shortcuts\.desktop
+
+
+
+Desktop shortcut\.
+
+
+
+*Type:*
+boolean
+
+
+
+*Default:*
+
+```nix
+false
+```
+
+
+
+## windows\.shortcuts\.startMenu
+
+
+
+Start-menu shortcut\.
+
+
+
+*Type:*
+boolean
+
+
+
+*Default:*
+
+```nix
+true
+```
+
+
+
+## windows\.upgradeCode
+
+
+
+Pinned ` UpgradeCode ` GUID for the MSI\. Derived deterministically from
+` bundleId ` if null — **pin this once you cut a release**, otherwise
+future MSIs won’t be recognised as upgrades\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+
+```nix
+null
+```
+
+
+
+*Example:*
+
+```nix
+"12345678-90AB-CDEF-1234-567890ABCDEF"
 ```
 
 
