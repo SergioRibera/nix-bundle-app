@@ -60,14 +60,14 @@ let
     !define DESCRIPTION "${esc meta.summary}"
     !define HOMEPAGE "${esc meta.homepage}"
 
-    Name "$\{DISPLAYNAME}"
+    Name "''${DISPLAYNAME}"
     ${lib.optionalString hasIcon ''
-      Icon "payload\\${iconRel}"
-      UninstallIcon "payload\\${iconRel}"
+      Icon "payload\${iconRel}"
+      UninstallIcon "payload\${iconRel}"
     ''}
     OutFile "${outFile}"
-    InstallDir "$PROGRAMFILES64\\${installDirName}"
-    InstallDirRegKey HKLM "Software\\$\{APPNAME}" "Install_Dir"
+    InstallDir "$PROGRAMFILES64\${installDirName}"
+    InstallDirRegKey HKLM "Software\''${APPNAME}" "Install_Dir"
     RequestExecutionLevel admin
     SetCompressor /SOLID lzma
     Unicode true
@@ -81,27 +81,27 @@ let
       ; HKLM, admin and $PROGRAMFILES: the Start-menu shortcut is machine-wide too.
       SetShellVarContext all
       SetOutPath "$INSTDIR"
-      File /r "payload\\*"
+      File /r "payload\*"
 
-      WriteRegStr HKLM "Software\\$\{APPNAME}" "Install_Dir" "$INSTDIR"
-      WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$\{APPNAME}" \
-                       "DisplayName" "$\{DISPLAYNAME}"
+      WriteRegStr HKLM "Software\''${APPNAME}" "Install_Dir" "$INSTDIR"
+      WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\''${APPNAME}" \
+                       "DisplayName" "''${DISPLAYNAME}"
       ${lib.optionalString hasIcon ''
-        WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$\{APPNAME}" \
-                         "DisplayIcon" "$INSTDIR\\${iconRel}"
+        WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\''${APPNAME}" \
+                         "DisplayIcon" "$INSTDIR\${iconRel}"
       ''}
-      WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$\{APPNAME}" \
-                       "DisplayVersion" "$\{APPVERSION}"
-      WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$\{APPNAME}" \
-                       "Publisher" "$\{COMPANYNAME}"
-      WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$\{APPNAME}" \
-                       "URLInfoAbout" "$\{HOMEPAGE}"
-      WriteRegStr HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$\{APPNAME}" \
-                       "UninstallString" '"$INSTDIR\\${uninstallerName}"'
+      WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\''${APPNAME}" \
+                       "DisplayVersion" "''${APPVERSION}"
+      WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\''${APPNAME}" \
+                       "Publisher" "''${COMPANYNAME}"
+      WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\''${APPNAME}" \
+                       "URLInfoAbout" "''${HOMEPAGE}"
+      WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\''${APPNAME}" \
+                       "UninstallString" '"$INSTDIR\${uninstallerName}"'
 
-      WriteUninstaller "$INSTDIR\\${uninstallerName}"
+      WriteUninstaller "$INSTDIR\${uninstallerName}"
 
-      CreateShortCut "$SMPROGRAMS\\$\{DISPLAYNAME}.lnk" "$INSTDIR\\${meta.name}.exe" "" "$INSTDIR\\${
+      CreateShortCut "$SMPROGRAMS\''${DISPLAYNAME}.lnk" "$INSTDIR\${meta.name}.exe" "" "$INSTDIR\${
         if hasIcon then iconRel else "${meta.name}.exe"
       }" 0
 
@@ -109,21 +109,21 @@ let
 
       ${lib.optionalString hasServices ''
         ; Register Windows services declared in info.services
-        nsExec::ExecToLog '"$INSTDIR\\install-services.bat"'
+        nsExec::ExecToLog '"$INSTDIR\install-services.bat"'
       ''}
     SectionEnd
 
     Section "Uninstall"
       SetShellVarContext all
       ${lib.optionalString hasServices ''
-        nsExec::ExecToLog '"$INSTDIR\\uninstall-services.bat"'
+        nsExec::ExecToLog '"$INSTDIR\uninstall-services.bat"'
       ''}
-      Delete "$INSTDIR\\${uninstallerName}"
+      Delete "$INSTDIR\${uninstallerName}"
       RMDir /r "$INSTDIR"
-      Delete "$SMPROGRAMS\\$\{DISPLAYNAME}.lnk"
+      Delete "$SMPROGRAMS\''${DISPLAYNAME}.lnk"
       ${fileAssociations.nsisUninstall meta}
-      DeleteRegKey HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$\{APPNAME}"
-      DeleteRegKey HKLM "Software\\$\{APPNAME}"
+      DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\''${APPNAME}"
+      DeleteRegKey HKLM "Software\''${APPNAME}"
     SectionEnd
   '';
 in
