@@ -105,7 +105,8 @@ Per-OS overrides only fill gaps the generic struct can't express:
 | `macos.infoPlist` | darwin formats | Extra `Info.plist` keys (attrset), applied last. |
 | `macos.entitlements` | darwin signing | Entitlements attrset embedded in `sign.sh`; exclusive with `signing.darwin.entitlements`. |
 | `permissions.network.local.reason` | darwin formats | `NSLocalNetworkUsageDescription`; without it macOS blocks LAN traffic silently. |
-| `permissions.network.local.udp`, `.tcp` | msi/nsis | Ports (list of int) that get an inbound firewall rule in a `perMachine` install. |
+| `permissions.network.local.udp`, `.tcp` | msi/nsis/snap | Ports (list of int): inbound firewall rule in a `perMachine` Windows install; snap `network-bind`. Any `network.local` also adds flatpak `--share=network` and snap `network`. |
+| `appstream.{enable,releaseDate,screenshots,metadataLicense}` | linux formats | AppStream metainfo at `/usr/share/metainfo/<bundleId>.metainfo.xml`; on by default with `desktopEntries`. Without `releaseDate` no `<release>` is listed. |
 | `windows.upgradeCode` | msi | Pin a stable UUID for released MSIs. Leaving it derived from `bundleId` is fine for first release but locks you in. Was `msiUpgradeCode`. |
 | `windows.installDirName` | msi/nsis | Install folder name, default `name`. Was `installDirName`. |
 | `windows.scope` | msi/nsis | `"perMachine"` (default: Program Files, admin, HKLM) or `"perUser"` (`%LOCALAPPDATA%\Programs`, no admin, HKCU; no firewall rules, no services). |

@@ -37,6 +37,7 @@ let
   };
   outFile = "${meta.name}-${meta.version}-${target.arch}.AppImage";
   fileAssociations = import ../file-associations.nix { inherit lib; };
+  appstream = import ../appstream.nix { inherit lib; };
   mimePackage = fileAssociations.mimePackage meta;
 
   # Runtime is a ~200KB ELF that mounts the appended squashfs and execs AppRun.
@@ -145,6 +146,7 @@ stdenv.mkDerivation {
       ${mimePackage}
       MIME_PACKAGE_EOF
     ''}
+    ${appstream.write meta "$AppDir"}
 
     ${lib.optionalString (meta.iconSet != null) ''
       cp "${meta.iconSet}/hicolor/256x256/apps/icon.png" "$AppDir/${primaryEntry.icon}.png"

@@ -56,7 +56,14 @@ let
 
   snapArch = if target.arch == "x86_64" then "amd64" else target.arch;
 
-  plugsBlock = lib.concatMapStringsSep "\n" (p: "      - ${p}") sn.plugs;
+  # `permissions.network.local` talks on the LAN; declared ports also listen.
+  local = meta.permissions.network.local;
+  plugs = lib.unique (
+    sn.plugs
+    ++ lib.optional (local != null) "network"
+    ++ lib.optional (local != null && (local.udp != [ ] || local.tcp != [ ])) "network-bind"
+  );
+  plugsBlock = lib.concatMapStringsSep "\n" (p: "      - ${p}") plugs;
 
   descIndented = lib.replaceStrings [ "\n" ] [ "\n  " ] meta.longDescription;
 

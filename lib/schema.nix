@@ -189,6 +189,46 @@ let
     };
   };
 
+  appstreamModule = {
+    options = {
+      enable = mkOption {
+        type = types.nullOr types.bool;
+        default = null;
+        description = "Ship the metainfo file. Defaults to on when `desktopEntries` is non-empty.";
+      };
+      releaseDate = mkOption {
+        type = types.nullOr (types.strMatching "[0-9]{4}-[0-9]{2}-[0-9]{2}");
+        default = null;
+        example = "2026-11-14";
+        description = "Date of this `version` (`YYYY-MM-DD`). Without it the metainfo lists no release, since AppStream needs one per release and a build has no reproducible \"today\".";
+      };
+      metadataLicense = mkOption {
+        type = types.str;
+        default = "CC0-1.0";
+        description = "SPDX license of the metainfo file itself (`metadata_license`). Flathub accepts CC0-1.0, CC-BY-*, FSFAP and MIT.";
+      };
+      screenshots = mkOption {
+        type = types.listOf (
+          types.submodule {
+            options = {
+              image = mkOption {
+                type = types.str;
+                description = "Public URL of the screenshot.";
+              };
+              caption = mkOption {
+                type = types.nullOr types.str;
+                default = null;
+                description = "Short caption.";
+              };
+            };
+          }
+        );
+        default = [ ];
+        description = "Screenshots for software centers; the first is the default one.";
+      };
+    };
+  };
+
   fileAssociationModule = {
     options = {
       id = mkOption {
@@ -1012,6 +1052,12 @@ let
       description = ''
         The app reaches devices on the local network: LAN broadcast or
         multicast discovery, or connections to other hosts on the LAN.
+
+        - macOS bundles: `NSLocalNetworkUsageDescription` from `reason`.
+        - Windows (MSI, NSIS, per machine): an inbound firewall rule for
+          `udp` / `tcp` ports, removed on uninstall.
+        - flatpak: `--share=network`; snap: `network`, plus `network-bind`
+          when ports are declared.
       '';
     };
   };
@@ -1197,6 +1243,19 @@ in
           `URL Protocol` and `shell\open\command` passing the URL as `%1`.
       '';
       example = literalExpression ''[ "hello" { scheme = "hello-dev"; name = "Hello (dev)"; } ]'';
+    };
+
+    appstream = mkOption {
+      type = types.submodule appstreamModule;
+      default = { };
+      description = ''
+        AppStream metainfo at `/usr/share/metainfo/<bundleId>.metainfo.xml`,
+        the listing GNOME Software, KDE Discover and Flathub show: id,
+        names, description (blank lines split paragraphs), license,
+        developer (`windows.publisher`'s default: `maintainer` without the
+        email), homepage, launchable desktop entry, release and screenshots.
+        Shipped by deb, rpm, archlinux, tar, flatpak and AppImage.
+      '';
     };
 
     services = mkOption {

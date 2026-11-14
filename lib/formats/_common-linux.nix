@@ -8,6 +8,7 @@
 
 let
   fileAssociations = import ../file-associations.nix { inherit lib; };
+  appstream = import ../appstream.nix { inherit lib; };
 
   systemdRenderedUnits = meta: map services.renderSystemd meta.services;
 
@@ -76,6 +77,8 @@ let
     '';
 
   hasMimePackage = meta: fileAssociations.mimePackage meta != null;
+
+  hasMetainfo = appstream.enabled;
 
   # `info.icon` as hicolor PNGs named `meta.iconName`.
   writeIconTheme =
@@ -202,6 +205,7 @@ let
       ${writeDesktopEntries meta stage}
       ${writeIconTheme meta stage}
       ${writeMimePackage meta stage}
+      ${appstream.write meta stage}
       ${writeExtraFiles meta stage}
     '';
 
@@ -285,6 +289,7 @@ in
     writeIconTheme
     writeMimePackage
     hasMimePackage
+    hasMetainfo
     systemdRenderedUnits
     enabledServiceNames
     hasServices

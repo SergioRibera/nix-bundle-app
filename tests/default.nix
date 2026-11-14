@@ -18,6 +18,7 @@ import ./hello-bundles.nix args
 // import ./hello-macos.nix args
 // import ./hello-windows.nix args
 // import ./hello-url-schemes.nix args
+// import ./hello-linux.nix args
 // import ./rust-linux.nix args
 // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux (import ./host-libs.nix args)
 // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin (import ./rust-darwin.nix args)

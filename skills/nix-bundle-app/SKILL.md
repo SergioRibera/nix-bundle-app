@@ -120,7 +120,8 @@ Wildcards (`tar.gz`, `tar.xz`, `tar.zst`, `zip`) are host-agnostic. `brew` works
 - `archlinux.output = "pkg" | "aur" | "both"` (default `"both"`).
 - `productbuild = { welcome; license; readme; conclusion; background; title; organization; allowCustomize; }`.
 - `macos = { icns; minimumSystemVersion; bundleSignature; category; copyright; buildVersion; infoPlist; entitlements; }` (the old flat `macOsIcon` / `minimumSystemVersion` / `bundleSignature` still work, with a warning).
-- `permissions.network.local = { reason; udp; tcp; }`: macOS local-network prompt text; Windows firewall rules for the ports (perMachine only).
+- `permissions.network.local = { reason; udp; tcp; }`: macOS local-network prompt text; Windows firewall rules for the ports (perMachine only); flatpak `--share=network`, snap `network` / `network-bind`.
+- `appstream = { enable; releaseDate; screenshots; metadataLicense; }`: AppStream metainfo on linux formats (default on with `desktopEntries`).
 
 **Other**:
 - `downloadUrl` — used by archlinux AUR `source=()` + `sha256sums=()`.

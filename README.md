@@ -207,6 +207,20 @@ info.permissions.network.local = { reason = "…"; udp = [ 7701 ]; tcp = [ ]; };
 
 `installDirName` and `msiUpgradeCode` moved to `windows.installDirName` and `windows.upgradeCode`; the old names still work and print a deprecation warning.
 
+### Linux: AppStream and sandbox permissions
+
+deb, rpm, archlinux, tar, flatpak and AppImage ship AppStream metainfo at `/usr/share/metainfo/<bundleId>.metainfo.xml` when the app has `desktopEntries` (or `appstream.enable = true`, which lists it as a console application). It is what GNOME Software, KDE Discover and Flathub show, built from `bundleId`, `displayName`, `summary`, `longDescription` (blank lines split paragraphs), `license`, `homepage`, the first desktop entry and `windows.publisher`'s default (the maintainer's name) as developer:
+
+```nix
+info.appstream = {
+  releaseDate = "2026-11-14";   # needed for a <release>; builds have no reproducible "today"
+  screenshots = [ { image = "https://example.com/shot.png"; caption = "Main window"; } ];
+  metadataLicense = "CC0-1.0";  # default
+};
+```
+
+`permissions.network.local` also opens the sandboxes: flatpak gets `--share=network`, snap gets `network`, plus `network-bind` when `udp` / `tcp` ports are declared.
+
 ### Extra system files (linux installer formats)
 
 `info.extraFiles` drops arbitrary files into the staged tree at fixed install paths — udev rules, modprobe.d snippets, modules-load.d, polkit policies, AppArmor profiles, anything that needs to land outside `/opt/<name>`. Honoured by `deb`, `rpm`, `archlinux`.

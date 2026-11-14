@@ -135,6 +135,7 @@ stdenv.mkDerivation {
       ${lib.optionalString hasEntries ''echo "/usr/share/applications/*"''}
       ${lib.optionalString hasIcons ''echo "/usr/share/icons/hicolor/*/apps/*"''}
       ${lib.optionalString (common.hasMimePackage meta) ''echo "/usr/share/mime/packages/*"''}
+      ${lib.optionalString (common.hasMetainfo meta) ''echo "/usr/share/metainfo/*"''}
       ${lib.concatMapStringsSep "\n      " (p: ''echo "${p}"'') (common.extraFilesPaths meta)}
       echo
       echo "%post"

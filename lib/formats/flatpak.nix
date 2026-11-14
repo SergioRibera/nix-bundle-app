@@ -57,7 +57,11 @@ let
   command = if fp.command != null then fp.command else meta.name;
   tarName = "${meta.name}-${meta.version}.tar.gz";
 
-  finishArgsYaml = lib.concatMapStringsSep "\n" (a: "  - ${a}") fp.finishArgs;
+  # `permissions.network.local` needs the network namespace shared.
+  finishArgs = lib.unique (
+    fp.finishArgs ++ lib.optional (meta.permissions.network.local != null) "--share=network"
+  );
+  finishArgsYaml = lib.concatMapStringsSep "\n" (a: "  - ${a}") finishArgs;
 
   extraModulesYaml =
     if fp.extraModules == [ ] then
@@ -88,6 +92,7 @@ let
           - if [ -d usr/share/applications ]; then install -Dm644 usr/share/applications/* /app/share/applications/ 2>/dev/null || true; fi
           - if [ -d usr/share/icons ]; then cp -a usr/share/icons /app/share/ 2>/dev/null || true; fi
           - if [ -d usr/share/mime/packages ]; then install -Dm644 -t /app/share/mime/packages usr/share/mime/packages/*; fi
+          - if [ -d usr/share/metainfo ]; then install -Dm644 -t /app/share/metainfo usr/share/metainfo/*; fi
     ${extraModulesYaml}
   '';
 
