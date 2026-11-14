@@ -19,6 +19,8 @@ let
 
   esc = utils.xmlEscape;
   pb = meta.productbuild;
+  # The installer's Customize button.
+  customize = if pb.allowCustomize then "allow" else "never";
 
   title = if pb.title != null then pb.title else meta.displayName;
   organization =
@@ -67,7 +69,7 @@ let
       ${lib.optionalString (resourceRefs.background != null)
         ''<background file="${esc (filenameFor "background" resourceRefs.background)}" alignment="topleft" scaling="none"/>''
       }
-      <options customize="never" require-scripts="false" allow-external-scripts="no"/>
+      <options customize="${customize}" require-scripts="false" allow-external-scripts="no"/>
       <choices-outline>
         <line choice="default">
           <line choice="${esc meta.bundleId}"/>
@@ -169,6 +171,7 @@ stdenv.mkDerivation (
 
     passthru = {
       info = meta;
+      distribution = distributionXml;
       inherit
         target
         format
