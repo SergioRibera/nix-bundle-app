@@ -15,7 +15,6 @@ Canonical schema lives in `lib/schema.nix`; this is a hand-curated quick-lookup.
 | `maintainer` | str | `"Unknown <unknown@example.com>"` | Deb/rpm `Maintainer:`. **Set this for real packages.** |
 | `homepage` | str | `drv.meta.homepage or ""` | Used in all manifests. |
 | `bundleId` | str | `"com.example.<name>"` | Reverse-DNS. Drives macOS bundle id, MSI UpgradeCode derivation, AppStream id. |
-| `bundleSignature` | str | `"????"` | macOS 4-char creator code. Rarely changed. |
 
 ## Layout
 
@@ -100,8 +99,13 @@ Per-OS overrides only fill gaps the generic struct can't express:
 | `productbuild.background` | productbuild | Path to the background image. |
 | `productbuild.title`, `.organization` | productbuild | Strings. |
 | `productbuild.allowCustomize` | productbuild | bool. |
-| `macOsIcon` | app/dmg/pkg/productbuild | `.icns` (path). |
-| `minimumSystemVersion` | darwin formats | e.g. `"11.0"`. |
+| `macos.icns` | app/dmg/pkg/productbuild | `.icns` (path) replacing the one rendered from `icon`. Was `macOsIcon`. |
+| `macos.minimumSystemVersion` | darwin formats | `LSMinimumSystemVersion`, e.g. `"11.0"`. Was `minimumSystemVersion`. |
+| `macos.bundleSignature` | darwin formats | 4-char creator code, default `"????"`. Was `bundleSignature`. |
+| `macos.category`, `.copyright`, `.buildVersion` | darwin formats | `LSApplicationCategoryType`, `NSHumanReadableCopyright`, `CFBundleVersion`. |
+| `macos.infoPlist` | darwin formats | Extra `Info.plist` keys (attrset), applied last. |
+| `macos.entitlements` | darwin signing | Entitlements attrset embedded in `sign.sh`; exclusive with `signing.darwin.entitlements`. |
+| `permissions.network.local.reason` | darwin formats | `NSLocalNetworkUsageDescription`; without it macOS blocks LAN traffic silently. |
 | `msiUpgradeCode` | msi | Pin a stable UUID for released MSIs. Leaving it derived from `bundleId` is fine for first release but locks you in. |
 
 ## Misc

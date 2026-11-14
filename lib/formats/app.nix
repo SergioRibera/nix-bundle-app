@@ -36,9 +36,10 @@ let
   };
   appName = meta.appBundleName;
   # An explicit `.icns` wins over the one rendered from `info.icon`.
+  mac = meta.macos;
   icns =
-    if meta.macOsIcon != null then
-      meta.macOsIcon
+    if mac.icns != null then
+      mac.icns
     else if meta.iconSet != null then
       "${meta.iconSet}/icon.icns"
     else
@@ -47,28 +48,33 @@ let
   renderedServices = services.renderAllLaunchd meta.services;
   fileAssociations = import ../file-associations.nix { inherit lib; };
 
-  plist = ''
-    <?xml version="1.0" encoding="UTF-8"?>
-    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-    <plist version="1.0">
-    <dict>
-      <key>CFBundleName</key>            <string>${meta.displayName}</string>
-      <key>CFBundleDisplayName</key>     <string>${meta.displayName}</string>
-      <key>CFBundleExecutable</key>      <string>${execName}</string>
-      <key>CFBundleIdentifier</key>      <string>${meta.bundleId}</string>
-      <key>CFBundleVersion</key>         <string>${meta.numericVersion}</string>
-      <key>CFBundleShortVersionString</key><string>${meta.numericVersion}</string>
-      <key>CFBundlePackageType</key>     <string>APPL</string>
-      <key>CFBundleSignature</key>       <string>${meta.bundleSignature}</string>
-      <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
-      <key>LSMinimumSystemVersion</key>  <string>${meta.minimumSystemVersion}</string>
-      <key>NSHighResolutionCapable</key> <true/>
-      <key>NSPrincipalClass</key>        <string>NSApplication</string>
-      ${lib.optionalString (icns != null) "<key>CFBundleIconFile</key><string>AppIcon.icns</string>"}
-      ${fileAssociations.plistKeys meta}
-    </dict>
-    </plist>
-  '';
+  localNetwork = meta.permissions.network.local;
+
+  # Generated keys first, `macos.infoPlist` last: an explicit key always wins.
+  plistKeys = {
+    CFBundleName = meta.displayName;
+    CFBundleDisplayName = meta.displayName;
+    CFBundleExecutable = execName;
+    CFBundleIdentifier = meta.bundleId;
+    CFBundleVersion = if mac.buildVersion != null then mac.buildVersion else meta.numericVersion;
+    CFBundleShortVersionString = meta.numericVersion;
+    CFBundlePackageType = "APPL";
+    CFBundleSignature = mac.bundleSignature;
+    CFBundleInfoDictionaryVersion = "6.0";
+    LSMinimumSystemVersion = mac.minimumSystemVersion;
+    NSHighResolutionCapable = true;
+    NSPrincipalClass = "NSApplication";
+  }
+  // lib.optionalAttrs (icns != null) { CFBundleIconFile = "AppIcon.icns"; }
+  // lib.optionalAttrs (mac.category != null) { LSApplicationCategoryType = mac.category; }
+  // lib.optionalAttrs (mac.copyright != null) { NSHumanReadableCopyright = mac.copyright; }
+  // lib.optionalAttrs (localNetwork != null) {
+    NSLocalNetworkUsageDescription = localNetwork.reason;
+  }
+  // fileAssociations.plistKeys meta
+  // mac.infoPlist;
+
+  plist = lib.generators.toPlist { escape = true; } plistKeys;
 in
 stdenv.mkDerivation {
   name = "${meta.name}-${meta.version}.app";
@@ -108,7 +114,7 @@ stdenv.mkDerivation {
         ${gnused}/bin/sed -i 's/^    //' "$appdir/Contents/Info.plist"
 
         cat > "$appdir/Contents/PkgInfo" <<EOF
-    APPL${meta.bundleSignature}
+    APPL${mac.bundleSignature}
     EOF
 
         ${lib.optionalString (renderedServices != [ ]) ''

@@ -57,67 +57,47 @@ let
 
   capitalize = s: lib.toUpper (builtins.substring 0 1 s) + builtins.substring 1 (-1) s;
 
-  plistArray = xs: "<array>${lib.concatMapStrings (x: "<string>${esc x}</string>") xs}</array>";
-
   # UTIs macOS already declares; importing them again is noise.
   isSystemUti =
     id: lib.hasPrefix "public." id || lib.hasPrefix "com.apple." id || id == "com.adobe.pdf";
 
-  utiDeclaration =
-    a:
-    "    <dict>\n"
-    + "      <key>UTTypeIdentifier</key><string>${esc a.id}</string>\n"
-    + "      <key>UTTypeDescription</key><string>${esc a.name}</string>\n"
-    + "      <key>UTTypeConformsTo</key>${plistArray a.conformsTo}\n"
-    + "      <key>UTTypeTagSpecification</key>\n"
-    + "      <dict>\n"
-    + lib.optionalString (
-      a.extensions != [ ]
-    ) "        <key>public.filename-extension</key>${plistArray a.extensions}\n"
-    + lib.optionalString (
-      a.mimeTypes != [ ]
-    ) "        <key>public.mime-type</key>${plistArray a.mimeTypes}\n"
-    + "      </dict>\n"
-    + "    </dict>\n";
+  utiDeclaration = a: {
+    UTTypeIdentifier = a.id;
+    UTTypeDescription = a.name;
+    UTTypeConformsTo = a.conformsTo;
+    UTTypeTagSpecification =
+      lib.optionalAttrs (a.extensions != [ ]) { "public.filename-extension" = a.extensions; }
+      // lib.optionalAttrs (a.mimeTypes != [ ]) { "public.mime-type" = a.mimeTypes; };
+  };
 
   documentType =
     a:
-    "    <dict>\n"
-    + "      <key>CFBundleTypeName</key><string>${esc a.name}</string>\n"
-    + "      <key>CFBundleTypeRole</key><string>${capitalize a.role}</string>\n"
-    + "      <key>LSHandlerRank</key><string>${capitalize a.rank}</string>\n"
-    + (
+    {
+      CFBundleTypeName = a.name;
+      CFBundleTypeRole = capitalize a.role;
+      LSHandlerRank = capitalize a.rank;
+    }
+    // (
       if a.id != null then
-        "      <key>LSItemContentTypes</key>${plistArray [ a.id ]}\n"
+        { LSItemContentTypes = [ a.id ]; }
       else
-        lib.optionalString (
-          a.extensions != [ ]
-        ) "      <key>CFBundleTypeExtensions</key>${plistArray a.extensions}\n"
-        + lib.optionalString (
-          a.mimeTypes != [ ]
-        ) "      <key>CFBundleTypeMIMETypes</key>${plistArray a.mimeTypes}\n"
-    )
-    + "    </dict>\n";
+        lib.optionalAttrs (a.extensions != [ ]) { CFBundleTypeExtensions = a.extensions; }
+        // lib.optionalAttrs (a.mimeTypes != [ ]) { CFBundleTypeMIMETypes = a.mimeTypes; }
+    );
 
-  # Info.plist keys, placed directly inside the top-level `<dict>` at a
-  # two-space indent.
+  # Info.plist keys as an attribute set, for `lib.generators.toPlist`.
   plistKeys =
     meta:
     let
       assocs = meta.fileAssociations or [ ];
       exported = exportedOf meta;
       imported = builtins.filter (a: !a.exported && a.id != null && !isSystemUti a.id) assocs;
-      section =
-        key: items: render:
-        lib.optional (items != [ ]) (
-          "<key>${key}</key>\n  <array>\n" + lib.concatMapStrings render items + "  </array>"
-        );
     in
-    lib.concatStringsSep "\n  " (
-      section "CFBundleDocumentTypes" assocs documentType
-      ++ section "UTExportedTypeDeclarations" exported utiDeclaration
-      ++ section "UTImportedTypeDeclarations" imported utiDeclaration
-    );
+    lib.optionalAttrs (assocs != [ ]) { CFBundleDocumentTypes = map documentType assocs; }
+    // lib.optionalAttrs (exported != [ ]) { UTExportedTypeDeclarations = map utiDeclaration exported; }
+    // lib.optionalAttrs (imported != [ ]) {
+      UTImportedTypeDeclarations = map utiDeclaration imported;
+    };
 
   # Windows: one ProgID per association that names extensions. Exported
   # types own their id; any other type gets an app-scoped ProgID so two

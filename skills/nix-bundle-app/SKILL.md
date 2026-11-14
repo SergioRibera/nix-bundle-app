@@ -92,7 +92,7 @@ Wildcards (`tar.gz`, `tar.xz`, `tar.zst`, `zip`) are host-agnostic. `brew` works
 **Identity** (auto-derived from `drv` when omitted):
 - `name`, `version`, `summary`, `description`, `longDescription`
 - `license`, `maintainer`, `homepage`
-- `bundleId` (reverse-DNS, default `com.example.<name>`), `bundleSignature` (macOS 4-char code)
+- `bundleId` (reverse-DNS, default `com.example.<name>`; also flatpak id, icon name and MSI upgrade seed)
 
 **Layout**:
 - `binDir = "bin"`, `libDir = "lib"`, `installDirName = name`
@@ -117,7 +117,8 @@ Wildcards (`tar.gz`, `tar.xz`, `tar.zst`, `zip`) are host-agnostic. `brew` works
 - `snap.{base,confinement,grade,plugs,summary}`.
 - `archlinux.output = "pkg" | "aur" | "both"` (default `"both"`).
 - `productbuild = { welcome; license; readme; conclusion; background; title; organization; allowCustomize; }`.
-- `macOsIcon`, `minimumSystemVersion`.
+- `macos = { icns; minimumSystemVersion; bundleSignature; category; copyright; buildVersion; infoPlist; entitlements; }` (the old flat `macOsIcon` / `minimumSystemVersion` / `bundleSignature` still work, with a warning).
+- `permissions.network.local.reason`: macOS local-network prompt text.
 
 **Other**:
 - `downloadUrl` — used by archlinux AUR `source=()` + `sha256sums=()`.

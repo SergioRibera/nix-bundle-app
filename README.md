@@ -135,11 +135,35 @@ info.icon = ./assets/icon.png;
 | deb / rpm / archlinux / tar.gz / flatpak | hicolor 16–512 px PNGs named after `bundleId`, default `Icon=` of every desktop entry | — (desktop entries carry their own `name`) |
 | AppImage | root `<icon>.png` + `.DirIcon` + hicolor tree | synthesized desktop entry |
 | snap | `snap/gui/icon.png` | `title:` |
-| app / dmg / pkg | `Contents/Resources/AppIcon.icns` (unless `macOsIcon`) | `<displayName>.app`, `CFBundleName`, DMG volume |
+| app / dmg / pkg | `Contents/Resources/AppIcon.icns` (unless `macos.icns`) | `<displayName>.app`, `CFBundleName`, DMG volume |
 | NSIS | installer + uninstaller icon, Start menu shortcut, "Apps & features" | installer title, shortcut, "Apps & features" |
 | MSI | `ARPPRODUCTICON` + shortcut icon | `ProductName`, shortcut, Start menu folder |
 
 The `.exe` itself keeps whatever icon its build embedded. Name desktop entries after `bundleId` (`fileName`) so Wayland and flatpak match windows to them.
+
+### macOS: Info.plist, permissions and entitlements
+
+`info.permissions` declares what the app needs once, and each format writes its own form; `info.macos` holds the settings only macOS bundles have:
+
+```nix
+info.permissions.network.local.reason = "Finds and streams from apps running on your network.";
+info.macos = {
+  category = "public.app-category.developer-tools";
+  copyright = "© 2026 Acme Inc.";
+  minimumSystemVersion = "11.0";
+  infoPlist = { LSUIElement = true; };          # any other key, applied last
+  entitlements = { "com.apple.security.network.client" = true; };
+};
+```
+
+| Option | app / dmg / pkg / productbuild |
+|---|---|
+| `permissions.network.local.reason` | `NSLocalNetworkUsageDescription`: macOS asks before LAN traffic instead of failing with "No route to host" |
+| `macos.category`, `macos.copyright`, `macos.buildVersion` | `LSApplicationCategoryType`, `NSHumanReadableCopyright`, `CFBundleVersion` |
+| `macos.infoPlist` | extra keys; they override generated ones |
+| `macos.entitlements` | embedded in `sign.sh` and passed to `rcodesign` (or point `signing.darwin.entitlements` at a file; not both) |
+
+`Info.plist` is generated with `lib.generators.toPlist`, so every value is escaped. `macOsIcon`, `bundleSignature` and `minimumSystemVersion` moved to `macos.icns`, `macos.bundleSignature` and `macos.minimumSystemVersion`; the old names still work and print a deprecation warning.
 
 ### Extra system files (linux installer formats)
 

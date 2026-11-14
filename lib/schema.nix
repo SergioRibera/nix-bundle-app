@@ -789,8 +789,112 @@ let
       };
     };
   };
+
+  macosModule = {
+    options = {
+      icns = mkOption {
+        type = types.nullOr (types.either types.path types.str);
+        default = null;
+        description = ''
+          `.icns` that replaces the one rendered from `icon`. Copied into
+          `Contents/Resources/AppIcon.icns` and referenced by `CFBundleIconFile`.
+        '';
+        example = literalExpression "./assets/app.icns";
+      };
+      bundleSignature = mkOption {
+        type = types.str;
+        default = "????";
+        description = "`CFBundleSignature` (4-char OSType code), also written to `PkgInfo`.";
+      };
+      minimumSystemVersion = mkOption {
+        type = types.str;
+        default = "10.13";
+        description = "`LSMinimumSystemVersion`.";
+      };
+      buildVersion = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = ''
+          `CFBundleVersion`, the build number. Defaults to the numeric
+          `version`, which is always `CFBundleShortVersionString`.
+        '';
+        example = "42";
+      };
+      category = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "`LSApplicationCategoryType`: where Finder and the App Store file the app.";
+        example = "public.app-category.developer-tools";
+      };
+      copyright = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "`NSHumanReadableCopyright`, shown in the About window and in Finder.";
+        example = "© 2026 Acme Inc.";
+      };
+      infoPlist = mkOption {
+        type = types.attrsOf types.anything;
+        default = { };
+        description = ''
+          Extra `Info.plist` keys for anything without its own option. Applied
+          last, so they override generated keys. Values are strings, booleans,
+          integers, lists and attribute sets (dictionaries).
+        '';
+        example = literalExpression ''
+          {
+            LSUIElement = true;
+            NSSupportsAutomaticGraphicsSwitching = true;
+          }
+        '';
+      };
+      entitlements = mkOption {
+        type = types.attrsOf types.anything;
+        default = { };
+        description = ''
+          Code-signing entitlements, rendered to a plist that `sign.sh` embeds.
+          Leave empty to use `signing.darwin.entitlements` (a file) instead;
+          setting both is an error.
+        '';
+        example = literalExpression ''
+          { "com.apple.security.network.client" = true; }
+        '';
+      };
+    };
+  };
+
+  localNetworkModule = {
+    options.reason = mkOption {
+      type = types.str;
+      description = ''
+        Why the app talks to devices on the local network, shown in the
+        permission prompt. macOS (`NSLocalNetworkUsageDescription`): without
+        it the system refuses LAN traffic without asking, and sockets fail
+        with "No route to host".
+      '';
+      example = "Finds and streams from apps running on your network.";
+    };
+  };
+
+  permissionsModule = {
+    options.network.local = mkOption {
+      type = types.nullOr (types.submodule localNetworkModule);
+      default = null;
+      description = ''
+        The app reaches devices on the local network: LAN broadcast or
+        multicast discovery, or connections to other hosts on the LAN.
+      '';
+    };
+  };
 in
 {
+  # The macOS-only options moved under `macos`; the old names keep working
+  # with a deprecation warning.
+  imports = [
+    (lib.mkRenamedOptionModule [ "macOsIcon" ] [ "macos" "icns" ])
+    (lib.mkRenamedOptionModule [ "bundleSignature" ] [ "macos" "bundleSignature" ])
+    (lib.mkRenamedOptionModule [ "minimumSystemVersion" ] [ "macos" "minimumSystemVersion" ])
+  ];
+
   options = {
     name = mkOption {
       type = types.str;
@@ -1088,27 +1192,27 @@ in
     bundleId = mkOption {
       type = types.nullOr types.str;
       default = null;
-      description = "macOS `CFBundleIdentifier`. Defaults to `com.example.<name>` when null.";
+      description = ''
+        Reverse-DNS app id: macOS `CFBundleIdentifier`, flatpak app id, icon
+        and MIME package name on linux, and the seed of the MSI `UpgradeCode`.
+        Defaults to `com.example.<name>` when null.
+      '';
       example = "com.acme.my-app";
     };
 
-    bundleSignature = mkOption {
-      type = types.str;
-      default = "????";
-      description = "macOS `CFBundleSignature` (4-char OSType code).";
+    macos = mkOption {
+      type = types.submodule macosModule;
+      default = { };
+      description = "macOS-only settings: the `.app` bundle's `Info.plist`, icon override and entitlements.";
     };
 
-    macOsIcon = mkOption {
-      type = types.nullOr (types.either types.path types.str);
-      default = null;
-      description = "Path to a `.icns` icon file. Copied into `Contents/Resources/AppIcon.icns` and referenced by `CFBundleIconFile`.";
-      example = literalExpression "./assets/app.icns";
-    };
-
-    minimumSystemVersion = mkOption {
-      type = types.str;
-      default = "10.13";
-      description = "macOS minimum system version (`LSMinimumSystemVersion`).";
+    permissions = mkOption {
+      type = types.submodule permissionsModule;
+      default = { };
+      description = ''
+        What the app needs from the system, declared once. Each format turns
+        it into its own form: usage descriptions in the macOS `Info.plist`.
+      '';
     };
 
     installDirName = mkOption {
@@ -1212,6 +1316,14 @@ in
       visible = false;
       description = "Internal: cross-field consistency checks. Failures throw at evaluation time.";
     };
+
+    warnings = mkOption {
+      type = types.listOf types.str;
+      default = [ ];
+      internal = true;
+      visible = false;
+      description = "Internal: messages printed at evaluation time, e.g. for renamed options.";
+    };
   };
 
   config = {
@@ -1275,6 +1387,12 @@ in
         message =
           "info.msiUpgradeCode must be a GUID of shape "
           + "'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX' (got '${toString config.msiUpgradeCode}').";
+      }
+      {
+        assertion = config.macos.entitlements == { } || config.signing.darwin.entitlements == null;
+        message =
+          "info.macos.entitlements and info.signing.darwin.entitlements are both set; "
+          + "keep one: the attribute set, or the path to an entitlements file.";
       }
     ];
   };

@@ -10,7 +10,10 @@ let
         modules = [
           schemaPath
           { _module.args = { inherit drv target format; }; }
-          { config = userInfo; }
+          {
+            _file = "info";
+            config = userInfo;
+          }
         ];
       };
 
@@ -61,14 +64,17 @@ let
         darwinArch = utils.darwinArch target.arch;
       };
     in
-    # Force assertion check before returning meta.
+    # Force assertion check before returning meta; warnings (renamed options)
+    # print once per evaluation.
     builtins.seq assertionGuard (
-      cfg
-      // derived
-      // {
-        # freedesktop icon name: flatpak requires it to equal the app id.
-        iconName = derived.bundleId;
-      }
+      lib.foldr (w: acc: lib.warn "nix-bundle-app: ${w}" acc) (
+        cfg
+        // derived
+        // {
+          # freedesktop icon name: flatpak requires it to equal the app id.
+          iconName = derived.bundleId;
+        }
+      ) cfg.warnings
     );
 in
 {

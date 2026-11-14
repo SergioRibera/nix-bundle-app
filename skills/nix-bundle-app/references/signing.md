@@ -11,7 +11,7 @@ info.signing = {
     p12File = ./certs/developer-id.p12;
     teamId = "ABC1234567";                    # 10-char Team ID
     hardenedRuntime = true;
-    entitlements = ./entitlements.plist;      # optional
+    entitlements = ./entitlements.plist;      # optional; or info.macos.entitlements = { ... }
   };
   windows = {
     enable = true;

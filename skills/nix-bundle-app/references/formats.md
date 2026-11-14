@@ -54,7 +54,7 @@ Read the entry for whichever format you're producing. Each section lists: requir
 ### `app`
 - Output: `<Name>.app/Contents/{MacOS,Frameworks,Resources}`.
 - No installer wrapper — drag-to-Applications.
-- `Info.plist` populated from `bundleId`, version, `bundleSignature`, `minimumSystemVersion`, icon.
+- `Info.plist` generated with `lib.generators.toPlist` from `bundleId`, version, `macos.*`, `permissions` and `fileAssociations`; `macos.infoPlist` adds or overrides keys.
 
 ### `dmg`
 - Tool on darwin: `hdiutil`. Tool on linux: `xorrisofs -hfsplus` (hybrid ISO, not byte-identical UDIF; Finder mounts fine).

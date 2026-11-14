@@ -7,7 +7,9 @@
 
 let
   # rcodesign — Apple-style signing without a macOS host. Works on linux.
-  darwinScript = cfg: artifactGlob: ''
+  # `entitlements`: `info.macos.entitlements`, embedded so sign.sh stays
+  # self-contained (an alternative to the `cfg.entitlements` file).
+  darwinScript = cfg: entitlements: artifactGlob: ''
     #!/usr/bin/env bash
     set -euo pipefail
     here=$(cd "$(dirname "$0")" && pwd)
@@ -39,6 +41,14 @@ let
     ${lib.optionalString (
       cfg.entitlements != null
     ) ''args+=( --entitlements-xml-path "${toString cfg.entitlements}" )''}
+    ${lib.optionalString (entitlements != { }) ''
+      entitlements=$(mktemp)
+      trap 'rm -f "$entitlements"' EXIT
+      cat > "$entitlements" <<'ENTITLEMENTS_EOF'
+      ${lib.generators.toPlist { escape = true; } entitlements}
+      ENTITLEMENTS_EOF
+      args+=( --entitlements-xml-path "$entitlements" )
+    ''}
     ${lib.optionalString (cfg.teamId != "") ''args+=( --team-name "$TEAM_ID" )''}
 
     shopt -s nullglob
@@ -195,6 +205,7 @@ let
     let
       script = pickScript {
         signing = meta.signing;
+        entitlements = meta.macos.entitlements or { };
         inherit format artifactGlob;
       };
     in
@@ -211,6 +222,7 @@ let
   pickScript =
     {
       signing,
+      entitlements ? { },
       format,
       artifactGlob,
     }:
@@ -220,7 +232,7 @@ let
       l = signing.linux;
     in
     if format == "app" || format == "dmg" || format == "pkg" || format == "productbuild" then
-      if d.enable then darwinScript d artifactGlob else null
+      if d.enable then darwinScript d entitlements artifactGlob else null
     else if format == "nsis" || format == "exe" || format == "msi" then
       if w.enable then windowsScript w artifactGlob else null
     else if format == "deb" then
