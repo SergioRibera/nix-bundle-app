@@ -50,14 +50,15 @@ let
   iconRel = "${meta.name}.ico";
 
   fileAssociations = import ../file-associations.nix { inherit lib; };
+  esc = utils.nsisEscape;
 
   nsi = ''
-    !define APPNAME "${meta.name}"
-    !define DISPLAYNAME "${meta.displayName}"
-    !define APPVERSION "${meta.version}"
-    !define COMPANYNAME "${meta.maintainer}"
-    !define DESCRIPTION "${meta.summary}"
-    !define HOMEPAGE "${meta.homepage}"
+    !define APPNAME "${esc meta.name}"
+    !define DISPLAYNAME "${esc meta.displayName}"
+    !define APPVERSION "${esc meta.version}"
+    !define COMPANYNAME "${esc meta.maintainer}"
+    !define DESCRIPTION "${esc meta.summary}"
+    !define HOMEPAGE "${esc meta.homepage}"
 
     Name "$\{DISPLAYNAME}"
     ${lib.optionalString hasIcon ''
@@ -77,6 +78,8 @@ let
     UninstPage instfiles
 
     Section "Install"
+      ; HKLM, admin and $PROGRAMFILES: the Start-menu shortcut is machine-wide too.
+      SetShellVarContext all
       SetOutPath "$INSTDIR"
       File /r "payload\\*"
 
@@ -111,6 +114,7 @@ let
     SectionEnd
 
     Section "Uninstall"
+      SetShellVarContext all
       ${lib.optionalString hasServices ''
         nsExec::ExecToLog '"$INSTDIR\\uninstall-services.bat"'
       ''}

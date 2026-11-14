@@ -3,7 +3,8 @@
 # `info.fileAssociations` rendered per platform. Pure string helpers: the
 # format modules decide where each piece lands.
 let
-  esc = (import ./utils.nix { inherit lib; }).xmlEscape;
+  utils = import ./utils.nix { inherit lib; };
+  esc = utils.xmlEscape;
 
   # Every MIME type the app opens, in declaration order.
   mimeTypesOf = meta: lib.unique (lib.concatMap (a: a.mimeTypes) (meta.fileAssociations or [ ]));
@@ -189,7 +190,7 @@ let
   # of this per-machine installer. Uninstall only clears an extension's
   # default when it still points at our ProgID.
   # NSIS string literal: `$` starts a variable, `$\"` is a quote.
-  nsisEsc = builtins.replaceStrings [ "$" "\"" ] [ "$$" "$\\\"" ];
+  nsisEsc = utils.nsisEscape;
 
   nsisInstall =
     meta:

@@ -97,6 +97,10 @@ rec {
   xmlEscape =
     s: builtins.replaceStrings [ "&" "<" ">" "\"" "'" ] [ "&amp;" "&lt;" "&gt;" "&quot;" "&apos;" ] s;
 
+  # NSIS string literal contents: `$` starts a variable and `"` ends the
+  # string, so both are escaped (`$$`, `$\"`).
+  nsisEscape = builtins.replaceStrings [ "$" "\"" ] [ "$$" "$\\\"" ];
+
   sanitizeName =
     s:
     let
